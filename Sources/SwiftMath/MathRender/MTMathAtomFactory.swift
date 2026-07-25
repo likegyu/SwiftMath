@@ -24,7 +24,28 @@ public class MTMathAtomFactory {
         "gets" : "leftarrow",
         "to" : "rightarrow",
         "iff" : "Longleftrightarrow",
-        "AA" : "angstrom"
+        "AA" : "angstrom",
+
+        // ── 표기 변형 별칭 (2026-07-26) ──────────────────────────────────────────
+        // 같은 글리프를 가리키는 다른 철자는 심볼을 새로 만들지 않고 여기로 보낸다.
+        // 역매핑(textToLatexSymbolName)이 오염되지 않고, 코드포인트 중복도 생기지 않는다.
+        "dots" : "ldots", "dotsc" : "ldots", "dotso" : "ldots", "mathellipsis" : "ldots",
+        "dotsb" : "cdots", "dotsi" : "cdots", "dotsm" : "cdots",
+        "impliedby" : "Longleftarrow",
+        "empty" : "emptyset", "exist" : "exists", "isin" : "in", "owns" : "ni",
+        "hslash" : "hbar", "image" : "Im", "real" : "Re", "weierp" : "wp", "infin" : "infty",
+        "plusmn" : "pm", "sdot" : "cdot",
+        "thickapprox" : "approx", "thicksim" : "sim", "varpropto" : "propto",
+        "vartriangle" : "triangle", "smallsetminus" : "setminus",
+        "shortmid" : "mid", "shortparallel" : "parallel",
+        "sub" : "subset", "sube" : "subseteq", "supe" : "supseteq",
+        "lVert" : "Vert", "rVert" : "Vert", "lvert" : "vert", "rvert" : "vert",
+        "Join" : "bowtie", "alef" : "aleph", "alefsym" : "aleph", "thetasym" : "vartheta",
+        "lang" : "langle", "rang" : "rangle",
+        "coloneq" : "coloneqq", "leadsto" : "rightsquigarrow", "lozenge" : "Diamond",
+        "pounds" : "mathsterling", "llless" : "lll", "gggtr" : "ggg",
+        "doteqdot" : "Doteq", "smallfrown" : "frown", "smallsmile" : "smile",
+        "restriction" : "upharpoonright",
     ]
     
     public static let delimiters = [
@@ -112,7 +133,12 @@ public class MTMathAtomFactory {
         "widetilde" :  "\u{0303}",
         "overleftarrow" :  "\u{20D6}",      // Combining left arrow above
         "overrightarrow" :  "\u{20D7}",     // Combining right arrow above (same as vec)
-        "overleftrightarrow" :  "\u{20E1}"  // Combining left right arrow above
+        "overleftrightarrow" :  "\u{20E1}", // Combining left right arrow above
+        // wideAccents 에는 있으나 이 표에 없어 도달할 수 없던 것들.
+        "mathring" :  "\u{030A}",           // Combining ring above
+        "dddot" :  "\u{20DB}",              // Combining three dots above
+        "ddddot" :  "\u{20DC}",             // Combining four dots above
+        "widecheck" :  "\u{030C}"           // check 와 같은 결합 caron
     ]
     
     private static let accentValueLock = NSLock()
@@ -149,7 +175,10 @@ public class MTMathAtomFactory {
     }
     
     static var supportedLatexSymbols: [String: MTMathAtom] = [
-        "square" : MTMathAtomFactory.placeholder(),
+        // \square 는 사용자가 쓰는 기호(□)다. placeholder 원자는 편집기용 특수 타입이라
+        // 조판·직렬화 경로가 다르므로 일반 기호로 둔다(placeholder() 자체는 분수·루트의
+        // 빈칸 생성에 그대로 쓰인다).
+        "square" : MTMathAtom(type: .ordinary, value: "\u{25A1}"),
         
          // Greek characters
         "alpha" : MTMathAtom(type: .variable, value: "\u{03B1}"),
@@ -541,10 +570,177 @@ public class MTMathAtomFactory {
         // Spacing
         "," : MTMathSpace(space: 3),
         ">" : MTMathSpace(space: 4),
+        ":" : MTMathSpace(space: 4),   // \: medium space
         ";" : MTMathSpace(space: 5),
         "!" : MTMathSpace(space: -3),
         "quad" : MTMathSpace(space: 18),  // quad = 1em = 18mu
         "qquad" : MTMathSpace(space: 36), // qquad = 2em
+
+        // ── amsmath/amssymb 확장 (2026-07-26) ────────────────────────────────────────
+        // 추가 원칙: latinmodern-math 에 글리프가 **실재하는** 코드포인트만 넣는다.
+        // 없는 코드포인트를 넣으면 파싱은 성공하고 CoreText가 시스템 CJK 폰트로 대체해
+        // 전각(1em) 글리프를 그린다 — 실패가 아니라 조용한 오조판이 된다.
+        // GlyphCoverageTests 가 이 규칙을 강제한다.
+
+        // 관계자
+        "therefore" : MTMathAtom(type: .relation, value: "\u{2234}"),
+        "because" : MTMathAtom(type: .relation, value: "\u{2235}"),
+        "lesssim" : MTMathAtom(type: .relation, value: "\u{2272}"),
+        "gtrsim" : MTMathAtom(type: .relation, value: "\u{2273}"),
+        "leqq" : MTMathAtom(type: .relation, value: "\u{2266}"),
+        "geqq" : MTMathAtom(type: .relation, value: "\u{2267}"),
+        "vDash" : MTMathAtom(type: .relation, value: "\u{22A8}"),
+        "Vdash" : MTMathAtom(type: .relation, value: "\u{22A9}"),
+        "Vvdash" : MTMathAtom(type: .relation, value: "\u{22AA}"),
+        "preccurlyeq" : MTMathAtom(type: .relation, value: "\u{227C}"),
+        "succcurlyeq" : MTMathAtom(type: .relation, value: "\u{227D}"),
+        "precsim" : MTMathAtom(type: .relation, value: "\u{227E}"),
+        "succsim" : MTMathAtom(type: .relation, value: "\u{227F}"),
+        "triangleq" : MTMathAtom(type: .relation, value: "\u{225C}"),
+        "coloneqq" : MTMathAtom(type: .relation, value: "\u{2254}"),
+        "eqqcolon" : MTMathAtom(type: .relation, value: "\u{2255}"),
+        "Doteq" : MTMathAtom(type: .relation, value: "\u{2251}"),
+        "approxeq" : MTMathAtom(type: .relation, value: "\u{224A}"),
+        "eqsim" : MTMathAtom(type: .relation, value: "\u{2242}"),
+        "backsim" : MTMathAtom(type: .relation, value: "\u{223D}"),
+        "circeq" : MTMathAtom(type: .relation, value: "\u{2257}"),
+        "bumpeq" : MTMathAtom(type: .relation, value: "\u{224F}"),
+        "Bumpeq" : MTMathAtom(type: .relation, value: "\u{224E}"),
+        "Subset" : MTMathAtom(type: .relation, value: "\u{22D0}"),
+        "Supset" : MTMathAtom(type: .relation, value: "\u{22D1}"),
+        "multimap" : MTMathAtom(type: .relation, value: "\u{22B8}"),
+        "between" : MTMathAtom(type: .relation, value: "\u{226C}"),
+        "gtrless" : MTMathAtom(type: .relation, value: "\u{2277}"),
+        "lessgtr" : MTMathAtom(type: .relation, value: "\u{2276}"),
+        "lessdot" : MTMathAtom(type: .relation, value: "\u{22D6}"),
+        "gtrdot" : MTMathAtom(type: .relation, value: "\u{22D7}"),
+        "lll" : MTMathAtom(type: .relation, value: "\u{22D8}"),
+        "ggg" : MTMathAtom(type: .relation, value: "\u{22D9}"),
+        "trianglelefteq" : MTMathAtom(type: .relation, value: "\u{22B4}"),
+        "trianglerighteq" : MTMathAtom(type: .relation, value: "\u{22B5}"),
+        "frown" : MTMathAtom(type: .relation, value: "\u{2322}"),
+        "smile" : MTMathAtom(type: .relation, value: "\u{2323}"),
+        "vcentcolon" : MTMathAtom(type: .relation, value: "\u{2236}"),
+        "ratio" : MTMathAtom(type: .relation, value: "\u{2236}"),
+
+        // 화살표 관계자 — 화학 평형(rightleftharpoons)·사상 표기에 자주 쓰인다.
+        "rightleftharpoons" : MTMathAtom(type: .relation, value: "\u{21CC}"),
+        "leftrightharpoons" : MTMathAtom(type: .relation, value: "\u{21CB}"),
+        "leftharpoonup" : MTMathAtom(type: .relation, value: "\u{21BC}"),
+        "leftharpoondown" : MTMathAtom(type: .relation, value: "\u{21BD}"),
+        "rightharpoonup" : MTMathAtom(type: .relation, value: "\u{21C0}"),
+        "rightharpoondown" : MTMathAtom(type: .relation, value: "\u{21C1}"),
+        "upharpoonright" : MTMathAtom(type: .relation, value: "\u{21BE}"),
+        "upharpoonleft" : MTMathAtom(type: .relation, value: "\u{21BF}"),
+        "downharpoonright" : MTMathAtom(type: .relation, value: "\u{21C2}"),
+        "downharpoonleft" : MTMathAtom(type: .relation, value: "\u{21C3}"),
+        "twoheadrightarrow" : MTMathAtom(type: .relation, value: "\u{21A0}"),
+        "twoheadleftarrow" : MTMathAtom(type: .relation, value: "\u{219E}"),
+        "rightsquigarrow" : MTMathAtom(type: .relation, value: "\u{21DD}"),
+        "nleftarrow" : MTMathAtom(type: .relation, value: "\u{219A}"),
+        "nrightarrow" : MTMathAtom(type: .relation, value: "\u{219B}"),
+        "curvearrowleft" : MTMathAtom(type: .relation, value: "\u{21B6}"),
+        "curvearrowright" : MTMathAtom(type: .relation, value: "\u{21B7}"),
+        "circlearrowleft" : MTMathAtom(type: .relation, value: "\u{21BA}"),
+        "circlearrowright" : MTMathAtom(type: .relation, value: "\u{21BB}"),
+        "leftrightarrows" : MTMathAtom(type: .relation, value: "\u{21C6}"),
+        "rightleftarrows" : MTMathAtom(type: .relation, value: "\u{21C4}"),
+        "leftleftarrows" : MTMathAtom(type: .relation, value: "\u{21C7}"),
+        "rightrightarrows" : MTMathAtom(type: .relation, value: "\u{21C9}"),
+        "upuparrows" : MTMathAtom(type: .relation, value: "\u{21C8}"),
+        "downdownarrows" : MTMathAtom(type: .relation, value: "\u{21CA}"),
+        "leftarrowtail" : MTMathAtom(type: .relation, value: "\u{21A2}"),
+        "rightarrowtail" : MTMathAtom(type: .relation, value: "\u{21A3}"),
+
+        // 이항 연산자
+        // ※ triangleleft/right 는 U+25C1/25B7 이다. U+25C3/25B9(작은 삼각형)는
+        //   latinmodern 이 갖고 있지 않아 CJK 폰트 전각으로 떨어진다.
+        "bigcirc" : MTMathAtom(type: .binaryOperator, value: "\u{25EF}"),
+        "Cap" : MTMathAtom(type: .binaryOperator, value: "\u{22D2}"),
+        "Cup" : MTMathAtom(type: .binaryOperator, value: "\u{22D3}"),
+        "leftthreetimes" : MTMathAtom(type: .binaryOperator, value: "\u{22CB}"),
+        "rightthreetimes" : MTMathAtom(type: .binaryOperator, value: "\u{22CC}"),
+        "triangleleft" : MTMathAtom(type: .binaryOperator, value: "\u{25C1}"),
+        "triangleright" : MTMathAtom(type: .binaryOperator, value: "\u{25B7}"),
+
+        // 일반 기호
+        "blacksquare" : MTMathAtom(type: .ordinary, value: "\u{25A0}"),
+        "checkmark" : MTMathAtom(type: .ordinary, value: "\u{2713}"),
+        "blacktriangle" : MTMathAtom(type: .ordinary, value: "\u{25B2}"),
+        "blacktriangledown" : MTMathAtom(type: .ordinary, value: "\u{25BC}"),
+        "blacktriangleleft" : MTMathAtom(type: .ordinary, value: "\u{25C0}"),
+        "blacktriangleright" : MTMathAtom(type: .ordinary, value: "\u{25B6}"),
+        "triangledown" : MTMathAtom(type: .ordinary, value: "\u{25BD}"),
+        "Diamond" : MTMathAtom(type: .ordinary, value: "\u{25CA}"),
+        "complement" : MTMathAtom(type: .ordinary, value: "\u{2201}"),
+        "sphericalangle" : MTMathAtom(type: .ordinary, value: "\u{2222}"),
+        "backprime" : MTMathAtom(type: .ordinary, value: "\u{2035}"),
+        "natural" : MTMathAtom(type: .ordinary, value: "\u{266E}"),
+        "flat" : MTMathAtom(type: .ordinary, value: "\u{266D}"),
+        "sharp" : MTMathAtom(type: .ordinary, value: "\u{266F}"),
+        "dag" : MTMathAtom(type: .ordinary, value: "\u{2020}"),
+        "ddag" : MTMathAtom(type: .ordinary, value: "\u{2021}"),
+        "circledR" : MTMathAtom(type: .ordinary, value: "\u{00AE}"),
+        "copyright" : MTMathAtom(type: .ordinary, value: "\u{00A9}"),
+        "mathsterling" : MTMathAtom(type: .ordinary, value: "\u{00A3}"),
+        "yen" : MTMathAtom(type: .ordinary, value: "\u{00A5}"),
+        "P" : MTMathAtom(type: .ordinary, value: "\u{00B6}"),
+        "S" : MTMathAtom(type: .ordinary, value: "\u{00A7}"),
+        "surd" : MTMathAtom(type: .ordinary, value: "\u{221A}"),
+        "eth" : MTMathAtom(type: .ordinary, value: "\u{00F0}"),
+        "smallint" : MTMathAtom(type: .ordinary, value: "\u{222B}"),
+        "clubsuit" : MTMathAtom(type: .ordinary, value: "\u{2663}"),
+        "diamondsuit" : MTMathAtom(type: .ordinary, value: "\u{2662}"),
+        "heartsuit" : MTMathAtom(type: .ordinary, value: "\u{2661}"),
+        "spadesuit" : MTMathAtom(type: .ordinary, value: "\u{2660}"),
+
+        // 대문자 그리스 — 기존 \Gamma 계열과 같은 .variable 로 둔다(조판기가 대문자
+        // 그리스를 upright 로 처리하므로 스타일이 일관된다).
+        "Alpha" : MTMathAtom(type: .variable, value: "\u{0391}"),
+        "Beta" : MTMathAtom(type: .variable, value: "\u{0392}"),
+        "Epsilon" : MTMathAtom(type: .variable, value: "\u{0395}"),
+        "Zeta" : MTMathAtom(type: .variable, value: "\u{0396}"),
+        "Eta" : MTMathAtom(type: .variable, value: "\u{0397}"),
+        "Iota" : MTMathAtom(type: .variable, value: "\u{0399}"),
+        "Kappa" : MTMathAtom(type: .variable, value: "\u{039A}"),
+        "Mu" : MTMathAtom(type: .variable, value: "\u{039C}"),
+        "Nu" : MTMathAtom(type: .variable, value: "\u{039D}"),
+        "Omicron" : MTMathAtom(type: .variable, value: "\u{039F}"),
+        "Rho" : MTMathAtom(type: .variable, value: "\u{03A1}"),
+        "Tau" : MTMathAtom(type: .variable, value: "\u{03A4}"),
+        "Chi" : MTMathAtom(type: .variable, value: "\u{03A7}"),
+
+        // 이름 있는 공백 — 폭은 measureSpace 가 MTMathSpace.space(mu)에서 읽는다.
+        "thinspace" : MTMathSpace(space: 3),
+        "medspace" : MTMathSpace(space: 4),
+        "thickspace" : MTMathSpace(space: 5),
+        "negthinspace" : MTMathSpace(space: -3),
+        "negmedspace" : MTMathSpace(space: -4),
+        "negthickspace" : MTMathSpace(space: -5),
+        "nobreakspace" : MTMathSpace(space: 6),
+        "space" : MTMathSpace(space: 6),
+        "enspace" : MTMathSpace(space: 9),
+
+        // 이름 있는 연산자
+        // 알려진 한계: \bmod 는 TeX에서 이항 연산자라 양옆에 간격이 붙어야 하는데, 여기서는
+        // largeOperator 로 만들어져 간격이 0이다(실측 `a\bmod b`=56.94 vs `amodb`=56.82).
+        // 그래도 두는 이유는 없을 때가 더 나쁘기 때문이다 — 미지원이면 호출부의 자가 치유가
+        // 명령 토큰을 벗겨 "mod" 라는 **낱말 자체가 사라지고** 수식의 의미가 바뀐다.
+        "bmod" : MTMathAtomFactory.operatorWithName("mod", limits: false),
+        "argmax" : MTMathAtomFactory.operatorWithName("arg max", limits: true),
+        "argmin" : MTMathAtomFactory.operatorWithName("arg min", limits: true),
+        "injlim" : MTMathAtomFactory.operatorWithName("inj lim", limits: true),
+        "projlim" : MTMathAtomFactory.operatorWithName("proj lim", limits: true),
+        "varliminf" : MTMathAtomFactory.operatorWithName("lim inf", limits: true),
+        "varlimsup" : MTMathAtomFactory.operatorWithName("lim sup", limits: true),
+        "plim" : MTMathAtomFactory.operatorWithName("plim", limits: true),
+        "cosec" : MTMathAtomFactory.operatorWithName("cosec", limits: false),
+        "ch" : MTMathAtomFactory.operatorWithName("ch", limits: false),
+        "sh" : MTMathAtomFactory.operatorWithName("sh", limits: false),
+        "th" : MTMathAtomFactory.operatorWithName("th", limits: false),
+        "tg" : MTMathAtomFactory.operatorWithName("tg", limits: false),
+        "ctg" : MTMathAtomFactory.operatorWithName("ctg", limits: false),
+        "cth" : MTMathAtomFactory.operatorWithName("cth", limits: false),
 
         // Style
         "displaystyle" : MTMathStyle(style: .display),
@@ -794,7 +990,11 @@ public class MTMathAtomFactory {
 				return atom(fromAccentedCharacter: ch)
             case _ where ch.utf32Char < 0x0021 || ch.utf32Char > 0x007E:
                 return nil
-            case "$", "%", "#", "&", "~", "\'", "^", "_", "{", "}", "\\":
+            case "~":
+                // LaTeX 의 묶음 공백(non-breaking space). 예전에는 nil 을 돌려줘 조용히
+                // 사라졌다 — "a~b" 가 "ab" 와 픽셀 단위로 같았다.
+                return MTMathSpace(space: 6)
+            case "$", "%", "#", "&", "\'", "^", "_", "{", "}", "\\":
                 return nil
             case "(", "[":
                 return MTMathAtom(type: .open, value: chStr)

@@ -1121,7 +1121,7 @@ class MTAtomTokenizer {
     private func tokenizeSpace(_ atom: MTMathAtom, prevAtom: MTMathAtom?, atomIndex: Int) -> MTBreakableElement? {
         // Space atoms typically don't participate in breaking
         // They are rendered as-is
-        let width = widthCalculator.measureSpace(atom.type)
+        let width = widthCalculator.measureSpace(atom)
 
         return MTBreakableElement(
             content: .space(width),

@@ -1138,8 +1138,18 @@ public struct MTMathListBuilder {
     mutating func skipSpaces() {
         while self.hasCharacters {
             let ch = self.getNextCharacter().utf32Char
-            if ch < 0x21 || ch > 0x7E {
-                // skip non ascii characters and spaces
+            // Skip whitespace and control characters only.
+            //
+            // Non-ASCII used to be skipped here too, which silently *ate* content: "\left한(x\right)"
+            // re-serialised as "\left( x\right)" — the 한 was gone with no error, and "\color{빨강}{x}"
+            // collapsed to "{}". Callers use this to step over layout whitespace, not to discard text,
+            // so anything meaningful must be handed back. Now such input produces a precise error
+            // ("Invalid delimiter for left: 한") that the caller can surface or fall back on, which is
+            // strictly better than losing characters without a trace.
+            //
+            // This completes the CJK work started in the builder's main loop: parsing accepts
+            // non-ASCII as ordinary atoms, so the scanner must stop treating it as whitespace.
+            if ch < 0x21 {
                 continue;
             } else {
                 self.unlookCharacter()
@@ -1511,7 +1521,11 @@ public struct MTMathListBuilder {
     }
     
     func MTAssertNotSpace(_ ch: Character) {
-        assert(ch >= "\u{21}" && ch <= "\u{7E}", "Expected non-space character \(ch)")
+        // Only the lower bound is a real invariant: callers guarantee whitespace has been skipped.
+        // The old upper bound (<= 0x7E) additionally asserted "ASCII", which now traps in DEBUG the
+        // moment CJK reaches a delimiter/environment scanner — and CJK reaching those points is
+        // exactly what skipSpaces() was changed to allow.
+        assert(ch >= "\u{21}", "Expected non-space character \(ch)")
     }
     
     mutating func buildTable(env: String?, alignment: MTColumnAlignment? = nil, firstList: MTMathList?, isRow: Bool) -> MTMathAtom? {
@@ -1600,7 +1614,11 @@ public struct MTMathListBuilder {
     }
     
     mutating func readCommand() -> String {
-        let singleChars = "{}$#%_| ,>;!\\"
+        // ':' is here for \: (medium space). Without it the backslash was consumed and the
+        // command name came back empty, so "a\:b" failed the whole expression with
+        // `Invalid command \` — an error message that also defeats caller-side recovery,
+        // since there is no command name to strip.
+        let singleChars = "{}$#%_| ,>;!:\\"
         if self.hasCharacters {
             let char = self.getNextCharacter()
             if let _ = singleChars.firstIndex(of: char)  {

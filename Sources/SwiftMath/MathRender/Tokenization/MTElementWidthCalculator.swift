@@ -83,26 +83,23 @@ class MTElementWidthCalculator {
 
     // MARK: - Space Width Measurement
 
-    /// Get width of explicit spacing command
-    func measureSpace(_ spaceType: MTMathAtomType) -> CGFloat {
+    /// Get width of an explicit spacing command.
+    ///
+    /// Takes the atom rather than its type because the amount lives on `MTMathSpace.space`
+    /// (in mu): \, = 3, \: = 4, \; = 5, \! = -3, \quad = 18, \qquad = 36. Measuring by type
+    /// alone could only ever return one constant, and it did — every spacing command rendered
+    /// as 3mu, so `\quad` and `\qquad` were indistinguishable from `\,` and the negative
+    /// space `\!` came out *positive*.
+    func measureSpace(_ atom: MTMathAtom) -> CGFloat {
         guard let mathTable = font.mathTable else { return 0 }
         let muUnit = mathTable.muUnit
 
-        // Note: These are the explicit spacing commands in LaTeX
-        // \, = thin space (3mu)
-        // \: = medium space (4mu)
-        // \; = thick space (5mu)
-        // \quad = 1em
-        // \qquad = 2em
-
-        switch spaceType {
-        case .space:
-            // Default space - context dependent
-            // For now, use thin space
-            return muUnit * 3
-        default:
-            return 0
+        if let space = atom as? MTMathSpace {
+            return space.space * muUnit
         }
+        // Not a spacing atom (or an unexpected subclass): fall back to a thin space so callers
+        // that reach here still get sane layout rather than a zero-width collapse.
+        return atom.type == .space ? muUnit * 3 : 0
     }
 
     /// Measure explicit space value
