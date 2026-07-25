@@ -523,6 +523,22 @@ public struct MTMathListBuilder {
                     // This enables Chinese, Japanese, Korean, emoji, etc. in \text{} commands
                     if spacesAllowed && currentFontStyle == .roman {
                         atom = MTMathAtom(type: .ordinary, value: String(char))
+                    } else if char.utf32Char > 0x007E {
+                        // Non-ASCII in *math* mode (outside \text{}): also accept as an ordinary
+                        // atom rather than dropping it.
+                        //
+                        // Silently discarding these is worse than rendering them imperfectly:
+                        // "속도 = 5" used to typeset as "=5" and "v_{초기}" as "v_{}" — the content
+                        // vanished with no error, so neither the user nor the caller could tell.
+                        // Real-world input (LLM-generated study notes in Korean/Japanese/Chinese)
+                        // routinely puts CJK inside math spans and subscripts, where authors are
+                        // unlikely to wrap every run in \text{}.
+                        //
+                        // The glyphs come from the fallback-font path added for \text{} (see
+                        // MTTypesetter), so they render the same way here. Control characters and
+                        // ASCII with LaTeX meaning ($ % # & ~ ' ^ _ { } \) are unaffected: they are
+                        // handled above or below and never reach this branch.
+                        atom = MTMathAtom(type: .ordinary, value: String(char))
                     } else {
                         // In math mode or non-text commands, skip unrecognized characters
                         continue

@@ -662,6 +662,17 @@ public class MTMathAtomFactory {
         "bm": .boldItalic,
         "boldsymbol": .boldItalic,
         "text": .roman,
+        // Script alphabet. TeX's \mathscr (mathrsfs/unicode-math) is a distinct, more ornate
+        // script than \mathcal, but the bundled math fonts expose one script alphabet — mapping
+        // it here renders the intended letterform instead of failing the *entire* expression
+        // with "Invalid command \mathscr". Physics/EE material uses it constantly (the electric
+        // field 𝓔 is the canonical case), so rejecting it is expensive in practice.
+        "mathscr": .caligraphic,
+        "scr": .caligraphic,
+        // Further amsmath/unicode-math spellings that map cleanly onto supported styles.
+        "pmb": .boldItalic,
+        "mathds": .blackboard,
+        "mathsfit": .sansSerif,
         // Note: operatorname is handled specially in MTMathListBuilder to create proper operators
     ]
     
