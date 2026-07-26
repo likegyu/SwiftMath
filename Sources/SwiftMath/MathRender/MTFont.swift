@@ -54,7 +54,14 @@ public class MTFont {
     public func copy(withSize size: CGFloat) -> MTFont {
         let newFont = MTFont()
         newFont.defaultCGFont = self.defaultCGFont
-        newFont.ctFont = CTFontCreateWithGraphicsFont(self.defaultCGFont, size, nil, nil)
+        // 크기만 바꾸고 **나머지 속성은 물려받는다.** 예전에는 defaultCGFont 로부터 CTFont 를
+        // 새로 만들었는데, 그러면 이 폰트에 붙여 둔 디스크립터 속성이 전부 사라졌다 — 특히
+        // cascade list(CJK 폴백 폰트 지정)가 유실됐다.
+        //
+        // 이 경로는 첨자·분수·루트처럼 **크기가 바뀌는 모든 조판**에서 불린다. 그래서 증상이
+        // 기묘했다: `\text{운동}` 은 지정한 폰트로 나오는데 `E_{운동}` 의 첨자만 시스템 기본
+        // 폴백으로 되돌아갔다(실측: cascade 항목 수 1 → 0).
+        newFont.ctFont = CTFontCreateCopyWithAttributes(self.ctFont, size, nil, nil)
         newFont.rawMathTable = self.rawMathTable
         newFont.mathTable = MTFontMathTable(withFont: newFont, mathTable: newFont.rawMathTable!)
         return newFont
