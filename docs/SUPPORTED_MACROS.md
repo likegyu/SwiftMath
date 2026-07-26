@@ -1,0 +1,131 @@
+# 지원 매크로 (likegyu/SwiftMath 포크)
+
+이 포크가 **무엇을 그릴 수 있고 무엇을 못 그리는지** 한곳에 모은 문서다.
+LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴다.
+
+수치는 실측이다. 기호 표에 491개, 별칭 62개가 등록돼 있고, 여기에 구조 명령·환경·악센트가
+더해진다. 대학 STEM 강의에서 쓰이는 매크로 136개를 추려 실제로 파싱시켜 본 결과
+**126개(93%)가 동작**했다. 못 하는 10개는 아래 "지원하지 않음"에 전부 적었다.
+
+> 검증 방식: `Tests/SwiftMathTests/SyntaxCoverageTests.swift` 가 문법 56종을
+> **로마자와 CJK 두 벌**로 만들어 ① display·text 두 스타일 조판 ② 파싱 중 CJK 유실 여부
+> ③ CJK가 조판 결과에서 실제로 자리를 차지하는지 ④ LaTeX로 되돌린 문자열의 재파싱을
+> 확인한다. 이 문서와 코드가 어긋나면 그 테스트가 먼저 깨진다.
+
+---
+
+## 지원하지 않음 (이것만 피하면 된다)
+
+| 매크로 | 이유 | 대신 |
+|---|---|---|
+| `\overbrace` `\underbrace` | 가로로 늘어나는 중괄호 글리프 조립(MATH 표의 수평 assembly)이 없다 | `\underset` 으로 아래에 설명을 달거나 말로 풀어 쓴다 |
+| `\xrightarrow` `\xleftarrow` | 라벨 폭에 맞춰 화살표를 늘려야 한다 | `\stackrel{라벨}{\longrightarrow}` |
+| `\ce{...}` (mhchem) | LaTeX가 아닌 별도 DSL이다 | `\text{H}_2\text{O}` 처럼 일반 LaTeX로 |
+| `\SI{}{}` (siunitx) | 위와 같음 | `3\,\text{m}` |
+| `\phantom` `\hphantom` `\vphantom` `\smash` `\mathstrut` | 자리 맞춤용 보이지 않는 상자 | 대개 없어도 된다 |
+| `\idotsint` | 단일 코드포인트가 없다 | `\int\cdots\int` |
+| `\underrightarrow` | 밑에 붙는 늘어나는 악센트 | `\underset{\rightarrow}{x}` |
+| `\begin{array}` `\begin{alignat}` `\begin{subarray}` `\begin{gathered}` | 미구현 환경 | `aligned` `cases` `pmatrix` `vmatrix` 는 된다 |
+| `\textcolor` `\color` `\colorbox` | 렌더러가 색을 무시한다(내용은 남는다) | 강조는 본문 서식으로 |
+
+**모르는 명령을 만나면** 파서가 `Invalid command \foo` 오류를 낸다. 소비자 앱은 보통
+그 명령만 지우고 다시 시도하거나(자가치유), 그래도 안 되면 원문을 그대로 보여준다.
+즉 미지원 매크로 하나가 수식 전체를 날리지는 않되, **그 장식의 의미는 사라진다.**
+
+---
+
+## 지원함
+
+### 구조
+
+`\frac` `\dfrac` `\tfrac` `\cfrac` · `\binom` `\dbinom` `\tbinom` · `\atop`
+`\sqrt{}` `\sqrt[n]{}` · `x^{}` `x_{}` (중첩 가능) · `\limits` `\nolimits`
+`\displaystyle` `\textstyle` `\scriptstyle` `\scriptscriptstyle`
+
+### 위·아래 쌓기
+
+`\overset{위}{본체}` `\underset{아래}{본체}` `\stackrel{위}{본체}` `\substack{a \\ b}`
+
+간격 등급은 본체를 물려받는다(amsmath `\binrel@`와 같다) — `\overset{?}{=}` 는 여전히
+관계연산자로 취급돼 앞뒤가 벌어지고, `\overset{a}{x}` 는 보통 원자다.
+`\stackrel` 은 정의상 항상 관계연산자다.
+
+### 덧그리는 장식
+
+`\boxed{}` `\fbox{}` `\framebox{}` — 테두리 (여백 0.2em)
+`\cancel{}` (↗) `\bcancel{}` (↘) `\xcancel{}` (×) — 취소선, 크기를 바꾸지 않는다
+`\overline{}` `\underline{}`
+
+### 악센트
+
+`\vec` `\hat` `\bar` `\dot` `\ddot` `\dddot` `\ddddot` `\tilde` `\check` `\breve`
+`\acute` `\grave` `\mathring` `\widehat` `\widetilde` `\widecheck`
+`\overrightarrow` `\overleftarrow` `\overleftrightarrow`
+
+### 구분자
+
+`\left` … `\right` 로 감싸면 내용 높이에 맞춰 늘어난다.
+`(` `)` `[` `]` `\{` `\}` `\langle` `\rangle` `\lfloor` `\rfloor` `\lceil` `\rceil`
+`|` `\|` `\vert` `\Vert` `\lvert` `\rvert` `\lVert` `\rVert`
+`\uparrow` `\downarrow` `\updownarrow` (및 대문자형) `\lgroup` `\rgroup` `\backslash` `.`
+
+### 환경
+
+`aligned` `cases` `matrix` `pmatrix` `bmatrix` `Bmatrix` `vmatrix` `Vmatrix`
+(별표형 `matrix*` 등은 열 정렬 지정을 받는다)
+
+### 큰 연산자
+
+`\sum` `\prod` `\coprod` `\int` `\iint` `\iiint` `\oint`
+`\bigcup` `\bigcap` `\bigoplus` `\bigotimes` `\bigodot` `\biguplus` `\bigvee` `\bigwedge` `\bigsqcup`
+`\lim` `\limsup` `\liminf` `\varlimsup` `\varliminf` `\varprojlim` `\varinjlim` `\injlim` `\projlim` `\plim`
+`\sup` `\inf` `\max` `\min` `\argmax` `\argmin` `\det` `\dim` `\ker` `\deg` `\gcd` `\Pr` `\arg` `\hom`
+`\sin` `\cos` `\tan` `\sec` `\csc` `\cot` `\cosec` 및 `arc`·`h` 변형 · `\log` `\ln` `\lg` `\exp`
+`\bmod` `\pmod{}` `\mod` · `\operatorname{}`
+
+### 글꼴
+
+`\mathbf` `\mathit` `\mathrm` `\mathnormal` `\mathbb` `\mathds` `\mathcal` `\mathscr` `\scr`
+`\mathfrak` `\mathsf` `\mathsfit` `\mathtt` `\bm` `\boldsymbol` `\pmb` `\text` `\textrm` `\textbf` 등
+
+### 기호 (491개 + 별칭 62개)
+
+그리스 대소문자 전체와 `\var` 변형, 관계·이항연산·화살표·집합·논리·기하 기호 일습.
+자주 쓰는 것 중 이 포크에서 **새로 추가된 것**들:
+
+`\therefore` `\because` `\vDash` `\models` `\coloneqq` `\lll` `\ggg`
+`\rightleftharpoons` `\leftrightharpoons` `\triangleleft` `\triangleright`
+`\blacksquare` `\square` `\checkmark` `\complement` `\natural` `\dag`
+`\permil` `\perthousand` · 대문자 그리스 `\Alpha`…`\Chi`
+
+### 간격
+
+`\,` `\:` `\;` `\!` `\quad` `\qquad` `\ ` `~`
+`\thinspace` `\medspace` `\thickspace` `\enspace` `\negthinspace`
+
+### CJK
+
+수식 모드 안에서 한글·한자·가나를 **그대로** 쓸 수 있다. `\text{}` 로 감쌀 필요가 없다.
+
+```latex
+E_{운동} = \frac{1}{2}mv^2
+\sum_{\substack{속도>0 \\ 가속도<0}} \text{힘}
+```
+
+서체는 기본적으로 CoreText 시스템 폴백이 고르는데, Apple 플랫폼에는 한글·중문 세리프가
+없어 수학 폰트(세리프)와 어긋난다. `SwiftMathCJKFonts` 모듈을 링크하면 번들 명조로 맞출 수 있다:
+
+```swift
+import SwiftMathCJKFonts
+let font = MTFontManager.fontManager.latinModernFont(withSize: 20)!
+    .copy(withCJKSerif: .korean, .simplifiedChinese)
+```
+
+---
+
+## 안전장치
+
+- **재귀 깊이 상한** `MTMathListBuilder.maxNestingDepth` (기본 100). 넘으면 스택 오버플로로
+  프로세스가 죽는 대신 `MTParseErrors.nestingTooDeep` 오류를 낸다. 신뢰할 수 없는 입력
+  (LLM이 만든 LaTeX)을 렌더할 때 필요하다.
+- 어긋난 중괄호·짝 없는 `\left` 등은 오류로 돌아오며 크래시하지 않는다.

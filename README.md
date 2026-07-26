@@ -1,5 +1,13 @@
 # SwiftMath
 
+> **이 저장소는 [mgriebling/SwiftMath](https://github.com/mgriebling/SwiftMath) 의 포크다.**
+> 원본과 달라진 점: 수식 모드에서 CJK를 `\text{}` 없이 그대로 쓸 수 있고, 한글·중문 명조를
+> 폴백 폰트로 지정할 수 있으며(`SwiftMathCJKFonts`), `\overset`·`\underset`·`\stackrel`·
+> `\substack`·`\boxed`·`\cancel` 계열을 강등 없이 실제로 장식해 조판하고, 파서에 재귀 깊이
+> 상한이 있어 깊게 중첩된 입력이 프로세스를 죽이지 않는다.
+>
+> **무엇을 쓸 수 있고 무엇을 못 쓰는지는 [docs/SUPPORTED_MACROS.md](docs/SUPPORTED_MACROS.md) 에 정리했다.**
+
 `SwiftMath` provides a full Swift implementation of [iosMath](https://travis-ci.org/kostub/iosMath) 
 for displaying beautifully rendered math equations in iOS and MacOS applications. It typesets formulae written 
 using LaTeX in a `UILabel` equivalent class. It uses the same typesetting rules as LaTeX and
