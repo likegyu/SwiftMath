@@ -93,7 +93,11 @@ class MTDisplayGenerator {
                 }
 
                 // Render the group
+                let groupDisplayCountBefore = displays.count
                 let groupAdvance = renderGroup(groupElements, at: CGPoint(x: position.x + xOffset, y: baseline), displays: &displays)
+                // 첨자가 붙은 원자는 그룹으로 묶여 이 경로로 온다. 여기서도 색을 입혀야
+                // `\textcolor{red}{x^2}` 가 검게 나오지 않는다.
+                applyElementColors(groupElements.first, to: &displays, from: groupDisplayCountBefore)
                 xOffset += groupAdvance
                 i = j
             } else {
@@ -111,6 +115,8 @@ class MTDisplayGenerator {
                 }
 
                 let elementPosition = CGPoint(x: position.x + xOffset + spacingBefore, y: baseline)
+
+                let displayCountBefore = displays.count
 
                 switch element.content {
                 case .text(let text):
@@ -136,6 +142,8 @@ class MTDisplayGenerator {
                     break
                 }
 
+                applyElementColors(element, to: &displays, from: displayCountBefore)
+
                 xOffset += element.width
                 i += 1
             }
@@ -145,6 +153,24 @@ class MTDisplayGenerator {
     }
 
     /// Render a group of elements (base + scripts) and return the horizontal advance
+    /// `\textcolor`·`\colorbox` 로 지정된 색을 방금 만들어진 표시들에 입힌다.
+    ///
+    /// `local*` 로 두는 게 핵심이다 — 바깥에서 수식 전체 색을 덮어쓸 때(MathImage 가 렌더
+    /// 직전에 그렇게 한다) 이 값이 있는 표시는 건너뛰도록 설계돼 있다.
+    private func applyElementColors(_ element: MTBreakableElement?, to displays: inout [MTDisplay],
+                                    from startIndex: Int) {
+        guard let element, element.color != nil || element.backgroundColor != nil else { return }
+        for k in startIndex..<displays.count {
+            if let color = element.color {
+                displays[k].localTextColor = color
+                displays[k].textColor = color
+            }
+            if let background = element.backgroundColor {
+                displays[k].localBackgroundColor = background
+            }
+        }
+    }
+
     private func renderGroup(_ groupElements: [MTBreakableElement], at position: CGPoint, displays: inout [MTDisplay]) -> CGFloat {
         var baseWidth: CGFloat = 0
         var superscriptWidth: CGFloat = 0

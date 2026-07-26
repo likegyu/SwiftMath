@@ -727,6 +727,16 @@ public struct MTMathListBuilder {
                         str += "\\underline"
                         str += "{\(mathListToString(underline.innerList!))}"
                     }
+                } else if let textColor = atom as? MTMathTextColor {
+                    // 색 원자는 되돌리기에 아예 빠져 있었다. nucleus 가 비어 있어 일반 경로가
+                    // `{}` 만 뱉었고, 색과 내용이 함께 사라졌다.
+                    str += "\\textcolor{\(textColor.colorString)}{\(mathListToString(textColor.innerList ?? MTMathList()))}"
+                } else if let colorbox = atom as? MTMathColorbox {
+                    str += "\\colorbox{\(colorbox.colorString)}{\(mathListToString(colorbox.innerList ?? MTMathList()))}"
+                } else if let color = atom as? MTMathColor {
+                    // MTMathTextColor 를 먼저 본다 — 상속 관계가 아니라 형제지만, 순서를
+                    // 고정해 두면 나중에 계층이 바뀌어도 의도가 남는다.
+                    str += "\\color{\(color.colorString)}{\(mathListToString(color.innerList ?? MTMathList()))}"
                 } else if let decorated = atom as? MTDecorated {
                     let name = MTMathListBuilder.decorationKinds
                         .first { $0.value == decorated.kind && $0.key != "fbox" && $0.key != "framebox" }?.key

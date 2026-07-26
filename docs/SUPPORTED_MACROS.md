@@ -5,7 +5,7 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 수치는 실측이다. 기호 표에 491개, 별칭 62개가 등록돼 있고, 여기에 구조 명령·환경·악센트가
 더해진다. 대학 STEM 강의에서 쓰이는 매크로 136개를 추려 실제로 파싱시켜 본 결과
-**126개(93%)가 동작**했다. 못 하는 10개는 아래 "지원하지 않음"에 전부 적었다.
+**126개(93%)가 동작**했다. 못 하는 것은 아래 "지원하지 않음"에 전부 적었다.
 
 > 검증 방식: `Tests/SwiftMathTests/SyntaxCoverageTests.swift` 가 문법 56종을
 > **로마자와 CJK 두 벌**로 만들어 ① display·text 두 스타일 조판 ② 파싱 중 CJK 유실 여부
@@ -26,7 +26,6 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 | `\idotsint` | 단일 코드포인트가 없다 | `\int\cdots\int` |
 | `\underrightarrow` | 밑에 붙는 늘어나는 악센트 | `\underset{\rightarrow}{x}` |
 | `\begin{array}` `\begin{alignat}` `\begin{subarray}` `\begin{gathered}` | 미구현 환경 | `aligned` `cases` `pmatrix` `vmatrix` 는 된다 |
-| `\textcolor` `\color` `\colorbox` | 렌더러가 색을 무시한다(내용은 남는다) | 강조는 본문 서식으로 |
 
 **모르는 명령을 만나면** 파서가 `Invalid command \foo` 오류를 낸다. 소비자 앱은 보통
 그 명령만 지우고 다시 시도하거나(자가치유), 그래도 안 되면 원문을 그대로 보여준다.
@@ -49,6 +48,16 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 간격 등급은 본체를 물려받는다(amsmath `\binrel@`와 같다) — `\overset{?}{=}` 는 여전히
 관계연산자로 취급돼 앞뒤가 벌어지고, `\overset{a}{x}` 는 보통 원자다.
 `\stackrel` 은 정의상 항상 관계연산자다.
+
+### 색
+
+`\textcolor{색}{내용}` `\color{색}{내용}` `\colorbox{색}{내용}`
+
+색 이름은 xcolor 기본 팔레트(`red` `blue` `green` `cyan` `magenta` `yellow` `black` `white`
+`gray`/`grey` `darkgray` `lightgray` `brown` `lime` `olive` `orange` `pink` `purple` `teal`
+`violet`)와 `#RRGGBB` 를 받는다. 모르는 이름이면 **색만 포기하고 내용은 그대로 그린다.**
+
+색이 걸린 부분은 바깥에서 수식 전체 색을 덮어써도 살아남고, 색 안에서도 줄바꿈이 된다.
 
 ### 덧그리는 장식
 

@@ -80,10 +80,10 @@ struct MTBreakableElement {
     // MARK: Optional attributes
 
     /// Text color for this element
-    let color: MTColor?
+    var color: MTColor?
 
     /// Background color for this element
-    let backgroundColor: MTColor?
+    var backgroundColor: MTColor?
 
     // MARK: Atomicity flag
 

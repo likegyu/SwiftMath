@@ -61,6 +61,13 @@ class MTAtomTokenizer {
                 atomTokenizer = self
             }
 
+            // 색 원자는 조각을 여러 개 낸다(안쪽에서 줄바꿈이 되어야 하므로).
+            if atom.type == .color || atom.type == .colorBox || atom.type == .textcolor {
+                elements.append(contentsOf: atomTokenizer.tokenizeColored(atom))
+                index += 1
+                continue
+            }
+
             // Handle scripts (subscript/superscript) - these must be grouped with their base
             if atom.superScript != nil || atom.subScript != nil {
                 let baseElements = atomTokenizer.tokenizeAtomWithScripts(atom, prevAtom: prevAtom, atomIndex: index, allAtoms: atoms)
@@ -154,10 +161,9 @@ class MTAtomTokenizer {
         case .style:
             return nil
 
-        // Color - extract inner content with color attribute
+        // 색은 여러 조각을 내므로 이 함수(하나만 반환)가 아니라 tokenize(_:) 본 루프에서 다룬다.
         case .color, .colorBox, .textcolor:
-            // For now, treat as ordinary (color will be handled in display generation)
-            return tokenizeTextAtom(atom, prevAtom: prevAtom, atomIndex: atomIndex, allAtoms: allAtoms)
+            return nil
 
         default:
             // Treat unknown types as ordinary
@@ -1061,6 +1067,43 @@ class MTAtomTokenizer {
             backgroundColor: nil,
             indivisible: true
         )
+    }
+
+    /// `\textcolor` `\color` `\colorbox` — 색을 입힌 내용.
+    ///
+    /// 예전에는 이 세 원자가 `tokenizeTextAtom` 으로 흘러갔는데, 거기서 `atom.nucleus` 가
+    /// 비면 nil 을 돌려준다. 색 원자의 내용은 nucleus 가 아니라 innerList 에 있어서 nucleus 는
+    /// **항상** 비어 있다. 결과적으로 감싼 내용이 통째로 사라졌고, 색 원자만 있는 수식은
+    /// 조판 자체가 nil 이 됐다(`\textcolor{red}{xyz}` → 아무것도 안 나옴).
+    ///
+    /// 내용을 한 덩이로 조판해 버리면 안 된다 — 그러면 색 안에서 줄바꿈이 막힌다.
+    /// 안쪽 리스트를 그대로 쪼개고, 나온 조각마다 색을 찍는다.
+    func tokenizeColored(_ atom: MTMathAtom) -> [MTBreakableElement] {
+        let innerList: MTMathList?
+        let colorString: String
+        switch atom {
+        case let a as MTMathTextColor: innerList = a.innerList; colorString = a.colorString
+        case let a as MTMathColor:     innerList = a.innerList; colorString = a.colorString
+        case let a as MTMathColorbox:  innerList = a.innerList; colorString = a.colorString
+        default:                       return []
+        }
+        guard let innerList, !innerList.atoms.isEmpty else { return [] }
+
+        // 바깥 리스트와 **같은 전처리**를 태운다. 안 그러면 인접한 보통 원자가 합쳐지지 않아
+        // `\textcolor{red}{xyz}` 가 `xyz` 보다 0.58pt 좁게 나온다(커닝이 사라진다).
+        var elements = self.tokenize(MTTypesetter.preprocessMathList(innerList))
+        // 이름을 못 알아들으면 색만 포기하고 내용은 그대로 그린다 — 색 하나 때문에
+        // 수식을 버리는 게 이 버그의 원래 증상이었다.
+        guard let color = MTColor.fromLatexColorName(colorString) else { return elements }
+
+        for i in elements.indices {
+            if atom.type == .colorBox {
+                elements[i].backgroundColor = color
+            } else {
+                elements[i].color = color
+            }
+        }
+        return elements
     }
 
     private func tokenizeDecorated(_ decorated: MTDecorated, prevAtom: MTMathAtom?, atomIndex: Int) -> MTBreakableElement? {
