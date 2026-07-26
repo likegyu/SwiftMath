@@ -21,6 +21,8 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 | `\tag{}` `\intertext{}` | 번호·본문 삽입 — 앱에 번호를 붙일 자리가 없다 | 없어도 된다 |
 | `\mathclap{}` `\prescript{}` `\genfrac{}` | mathtools 세부 조판 | 드물다 |
 | `\chemfig{}` (2차원 구조식) | 결합각·고리를 그리는 별도 그리기 언어 | `\ce{}` 로 선형 표기 |
+| `\sideset` `\mathchoice` `\buildrel` `\pod` | plain TeX·amsmath 세부 조판 | 드물다 |
+| `\root n \of x` | plain TeX 표기 | `\sqrt[n]{x}` |
 
 **모르는 명령을 만나면** 파서가 `Invalid command \foo` 오류를 낸다. 소비자 앱은 보통
 그 명령만 지우고 다시 시도하거나(자가치유), 그래도 안 되면 원문을 그대로 보여준다.
@@ -118,7 +120,10 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 ### 글꼴
 
 `\mathbf` `\mathit` `\mathrm` `\mathnormal` `\mathbb` `\mathds` `\mathcal` `\mathscr` `\scr`
-`\mathfrak` `\mathsf` `\mathsfit` `\mathtt` `\bm` `\boldsymbol` `\pmb` `\text` `\textrm` `\textbf` 등
+`\mathfrak` `\mathsf` `\mathsfit` `\mathtt` `\bm` `\boldsymbol` `\pmb`
+`\text` `\textrm` `\textbf` `\textit` `\texttt` `\textsf` `\textnormal` `\textup` `\textmd`
+`\textsl` `\textsc` `\emph` `\mbox` `\ensuremath`
+(작은대문자·기울임체는 이 조판기에 없어 가장 가까운 서체로 떨어진다)
 
 ### 기호 (491개 + 별칭 62개)
 
@@ -129,11 +134,20 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 `\rightleftharpoons` `\leftrightharpoons` `\triangleleft` `\triangleright`
 `\blacksquare` `\square` `\checkmark` `\complement` `\natural` `\dag`
 `\permil` `\perthousand` · 대문자 그리스 `\Alpha`…`\Chi`
+이탤릭 대문자 그리스 `\varGamma` `\varDelta` `\varTheta` `\varLambda` `\varXi` `\varPi`
+`\varSigma` `\varUpsilon` `\varPhi` `\varPsi` `\varOmega`
+곡면·부피 적분 `\oiint` `\oiiint`
+
+`\not` 은 `\not\in` 같은 명령형과 **`\not=` 같은 맨 문자형을 모두** 받는다.
 
 ### 간격
 
 `\,` `\:` `\;` `\!` `\quad` `\qquad` `\ ` `~`
 `\thinspace` `\medspace` `\thickspace` `\enspace` `\negthinspace`
+
+명시적 간격도 받는다 — `\hspace{1cm}` `\kern 5pt` `\hskip 3pt` `\mspace{9mu}` `\mkern 18mu`.
+`pt`·`cm` 같은 절대 단위는 1em ≈ 10pt 로 **근사해서** mu 로 옮긴다(이 조판기의 간격이 mu 기반이라
+정확히 옮길 수 없다). `\hfill` 은 인라인 수식에서 의미가 없어 `\quad` 로 둔다.
 
 ### physics 패키지
 
@@ -142,6 +156,15 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 `\bra{}` `\ket{}` `\braket{}{}` `\ev{}` `\comm{}{}` `\acomm{}{}` — 양자역학 표기
 `\grad` `\divergence` `\curl` `\laplacian` — 벡터 미분
 `\middle` 는 받되 **늘어나지는 않는다**(보통 크기 구분자로 둔다).
+
+### 사용자 매크로
+
+`\newcommand{\R}{\mathbb{R}}` `\newcommand{\f}[1]{f(#1)}` `\def\x{y}`
+`\renewcommand` `\providecommand` · `\DeclareMathOperator{\tr}{tr}` (별표형은 첨자를 위아래로)
+
+인자는 `#1`…`#9`. 정의는 같은 문자열 안에서만 유효하다.
+**펼치기 깊이 상한 20** — `\def\x{\x}` 같은 자기 참조나 상호 재귀가 들어와도 무한히 돌지 않고
+`nestingTooDeep` 오류로 끝난다. 신뢰할 수 없는 입력을 렌더하는 이상 필요한 방어다.
 
 ### 간격 등급 지정
 

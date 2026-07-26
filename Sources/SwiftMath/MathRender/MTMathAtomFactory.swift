@@ -42,6 +42,7 @@ public class MTMathAtomFactory {
         "lVert" : "Vert", "rVert" : "Vert", "lvert" : "vert", "rvert" : "vert",
         "Join" : "bowtie", "alef" : "aleph", "alefsym" : "aleph", "thetasym" : "vartheta",
         "lang" : "langle", "rang" : "rangle",
+        "hdots" : "ldots",
         "coloneq" : "coloneqq", "leadsto" : "rightsquigarrow", "lozenge" : "Diamond",
         "pounds" : "mathsterling", "llless" : "lll", "gggtr" : "ggg",
         "doteqdot" : "Doteq", "smallfrown" : "frown", "smallsmile" : "smile",
@@ -546,6 +547,22 @@ public class MTMathAtomFactory {
         "Vert" : MTMathAtom(type: .ordinary, value: "\u{2016}"),
         // 천분율 — 화학·환경공학 농도 표기에 나온다.
         "permil" : MTMathAtom(type: .ordinary, value: "\u{2030}"),
+        // amsmath 의 이탤릭 대문자 그리스. \Gamma 는 정립, \varGamma 는 이탤릭이다.
+        // .variable 로 두면 조판기가 이탤릭으로 그린다.
+        "varGamma" : MTMathAtom(type: .variable, value: "\u{0393}"),
+        "varDelta" : MTMathAtom(type: .variable, value: "\u{0394}"),
+        "varTheta" : MTMathAtom(type: .variable, value: "\u{0398}"),
+        "varLambda" : MTMathAtom(type: .variable, value: "\u{039B}"),
+        "varXi" : MTMathAtom(type: .variable, value: "\u{039E}"),
+        "varPi" : MTMathAtom(type: .variable, value: "\u{03A0}"),
+        "varSigma" : MTMathAtom(type: .variable, value: "\u{03A3}"),
+        "varUpsilon" : MTMathAtom(type: .variable, value: "\u{03A5}"),
+        "varPhi" : MTMathAtom(type: .variable, value: "\u{03A6}"),
+        "varPsi" : MTMathAtom(type: .variable, value: "\u{03A8}"),
+        "varOmega" : MTMathAtom(type: .variable, value: "\u{03A9}"),
+        // 곡면·부피 적분(esint). 물리·전자기학에 나온다.
+        "oiint" : MTMathAtomFactory.operatorWithName("\u{222F}", limits: false),
+        "oiiint" : MTMathAtomFactory.operatorWithName("\u{2230}", limits: false),
         "perthousand" : MTMathAtom(type: .ordinary, value: "\u{2030}"),
         "hbar" : MTMathAtom(type: .ordinary, value: "\u{210F}"),
         "lbar" : MTMathAtom(type: .ordinary, value: "\u{019B}"),  // NEW ƛ
@@ -892,6 +909,15 @@ public class MTMathAtomFactory {
         "texttt": .typewriter,
         "mathit": .italic,
         "textit": .italic,
+        // 표준 LaTeX 텍스트 명령들. 이 조판기에 없는 서체(작은대문자·기울임체)는
+        // 가장 가까운 것으로 떨어뜨린다 — 서체가 조금 다른 게 명령이 통째로 실패하는 것보다 낫다.
+        "textnormal": .roman,
+        "textup": .roman,
+        "textmd": .roman,
+        "mbox": .roman,
+        "textsc": .roman,      // 작은대문자 미지원 → 로만
+        "textsl": .italic,     // 기울임체 → 이탤릭
+        "emph": .italic,
         "mit": .italic,
         "mathsf": .sansSerif,
         "textsf": .sansSerif,

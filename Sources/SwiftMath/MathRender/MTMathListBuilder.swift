@@ -103,6 +103,13 @@ public struct MTMathListBuilder {
     /// 스택 사용량에 비례한다.
     var nestingDepth = 0
 
+    /// `\newcommand`·`\def` 로 정의된 사용자 매크로. (인자 수, 본문)
+    var macros: [String: (params: Int, body: String)] = [:]
+    /// 매크로 펼치기 깊이. 자기를 참조하는 정의가 무한히 도는 걸 막는다.
+    var macroDepth = 0
+    /// 매크로 펼치기 상한. 사람이 쓰는 매크로는 두세 겹을 넘지 않는다.
+    static let maxMacroDepth = 20
+
     /// 파서가 따라 들어갈 최대 중첩 깊이.
     ///
     /// 스택 오버플로는 Swift 의 오류 처리로 **잡을 수 없다** — 프로세스가 즉사한다.
@@ -502,6 +509,15 @@ public struct MTMathListBuilder {
                     continue
                 }
                 
+                // 사용자가 정의한 매크로를 먼저 본다 — 내장 명령을 덮어쓸 수 있어야 한다.
+                if let sublist = self.expandUserMacro(command) {
+                    prevAtom = sublist.atoms.last
+                    list.append(sublist)
+                    if oneCharOnly { return list }
+                    continue
+                }
+                if error != nil { return nil }
+
                 // \ce·\SI 는 별도 문법이라 원문을 통째로 받아 LaTeX 로 옮긴 뒤 다시 파싱한다.
                 // 원자 하나가 아니라 리스트가 나오므로 여기서 바로 이어 붙인다.
                 if let sublist = self.expandScienceNotation(command) {
@@ -842,6 +858,24 @@ public struct MTMathListBuilder {
         return ""
     }
     
+    /// `\not` 뒤에 **맨 문자**가 오는 형태. `\not=` 는 `\neq` 만큼 흔하다.
+    static let notCharacters: [Character: String] = [
+        "=": "\u{2260}",   // ≠
+        "<": "\u{226E}",   // ≮
+        ">": "\u{226F}",   // ≯
+        "|": "\u{2224}",   // ∤
+    ]
+
+    /// 명시적 간격 명령과 그 인자 단위. 값은 **mu**(1em = 18mu)로 환산한다.
+    ///
+    /// pt·cm 같은 절대 단위는 글자 크기와 무관한데 이 조판기의 간격은 mu 기반이라
+    /// 정확히 옮길 수 없다. 1em ≈ 10pt 로 잡아 근사한다 — 수식 안 간격 조정은 미세
+    /// 조정이 목적이라 이 정도 오차는 눈에 띄지 않는다.
+    static let dimensionToMu: [String: CGFloat] = [
+        "mu": 1, "em": 18, "ex": 8, "pt": 1.8, "bp": 1.8, "pc": 21.6,
+        "cm": 51.2, "mm": 5.12, "in": 130, "sp": 0.0000275,
+    ]
+
     /// 별표형이 "번호를 안 붙인다"는 뜻뿐인 환경들. 별을 떼고 같은 조판을 쓴다.
     static let numberlessEnvironments: Set<String> = [
         "align", "alignat", "flalign", "equation", "multline", "gather", "gathered", "eqnarray",
@@ -1270,11 +1304,16 @@ public struct MTMathListBuilder {
             if let negatedUnicode = Self.notCombinations[nextCommand] {
                 self.consumeNextCommand() // Remove base symbol from stream
                 return MTMathAtom(type: .relation, value: negatedUnicode)
-            } else {
-                let errorMessage = "Unsupported \\not\\\(nextCommand) combination"
-                self.setError(.invalidCommand, message: errorMessage)
-                return nil
             }
+            // `\not=` 처럼 **맨 문자**가 뒤따르는 형태. 위 조회는 `\command` 만 본다.
+            self.skipSpaces()
+            if hasCharacters, let negated = Self.notCharacters[string[currentCharIndex]] {
+                _ = self.getNextCharacter()
+                return MTMathAtom(type: .relation, value: negated)
+            }
+            let errorMessage = "Unsupported \\not\\\(nextCommand) combination"
+            self.setError(.invalidCommand, message: errorMessage)
+            return nil
         } else if let sizeMultiplier = Self.delimiterSizeCommands[command] {
             // Handle \big, \Big, \bigg, \Bigg and their variants
             let delim = self.readDelimiter()
@@ -1809,6 +1848,50 @@ public struct MTMathListBuilder {
             if sublist.atoms.count == 1 { sublist.atoms[0].type = newType }
             return sublist
 
+        case "newcommand", "renewcommand", "providecommand", "def", "let":
+            // 사용자 매크로 정의. `\newcommand{\R}{\mathbb{R}}` · `\def\R{\mathbb{R}}`
+            // 인자 있는 형태 `\newcommand{\f}[1]{f(#1)}` 도 받는다.
+            guard let name = readMacroName() else { return MTMathList() }
+            var parameterCount = 0
+            self.skipSpaces()
+            if hasCharacters, string[currentCharIndex] == "[" {
+                _ = getNextCharacter()
+                var digits = ""
+                while hasCharacters {
+                    let ch = getNextCharacter()
+                    if ch == "]" { break }
+                    digits.append(ch)
+                }
+                parameterCount = Int(digits.trimmingCharacters(in: .whitespaces)) ?? 0
+            }
+            guard let body = readRawGroup() else { return MTMathList() }
+            macros[name] = (parameterCount, body)
+            return MTMathList()
+
+        case "DeclareMathOperator":
+            // `\DeclareMathOperator{\tr}{tr}` — 이름 있는 연산자를 만든다.
+            // 별표형(\DeclareMathOperator*)은 첨자를 위아래로 붙인다.
+            let starred = hasCharacters && string[currentCharIndex] == "*"
+            if starred { _ = getNextCharacter() }
+            guard let name = readMacroName(), let text = readRawGroup() else { return MTMathList() }
+            MTMathAtomFactory.add(latexSymbol: name,
+                                  value: MTMathAtomFactory.operatorWithName(text, limits: starred))
+            return MTMathList()
+
+        case "ensuremath":
+            // "수식 모드로 그려라"는 지시. 이미 수식 모드이므로 인자를 그대로 낸다.
+            return self.buildInternal(true)
+
+        case "hspace", "kern", "hskip", "mspace", "mkern", "hfill", "hfil", "quad_":
+            // 명시적 간격. `\hspace{1cm}` 처럼 중괄호 인자이거나 `\kern 5pt` 처럼 맨몸이다.
+            if command == "hfill" || command == "hfil" {
+                // 채움 간격은 인라인 수식에서 의미가 없다 — \quad 로 둔다.
+                return MTMathList(atom: MTMathSpace(space: 18))
+            }
+            let raw = readRawGroup() ?? readBareDimension()
+            guard let raw else { return MTMathList() }
+            return MTMathList(atom: MTMathSpace(space: parseDimensionToMu(raw)))
+
         case "notag", "nonumber":
             // 번호를 붙이지 않는다는 지시. 앱에는 번호가 없으니 아무 일도 하지 않는다.
             // 다만 **오류를 내면 안 된다** — 수식 하나가 통째로 날아간다.
@@ -1847,6 +1930,74 @@ public struct MTMathListBuilder {
         default:
             return nil
         }
+    }
+
+    /// `{\R}` 이나 `\R` 형태의 매크로 이름을 읽는다(역슬래시는 뗀다).
+    mutating func readMacroName() -> String? {
+        self.skipSpaces()
+        guard hasCharacters else { return nil }
+        let braced = string[currentCharIndex] == "{"
+        if braced { _ = getNextCharacter(); self.skipSpaces() }
+        guard hasCharacters, getNextCharacter() == "\\" else { return nil }
+        var name = ""
+        while hasCharacters, string[currentCharIndex].isLetter { name.append(getNextCharacter()) }
+        if braced {
+            self.skipSpaces()
+            if hasCharacters, string[currentCharIndex] == "}" { _ = getNextCharacter() }
+        }
+        return name.isEmpty ? nil : name
+    }
+
+    /// 정의된 사용자 매크로를 펼친다. 해당 이름이 없으면 nil.
+    ///
+    /// 재귀 상한이 있다 — `\def\x{\x}` 같은 자기 참조가 들어와도 무한히 돌지 않는다.
+    /// 신뢰할 수 없는 입력을 렌더하는 이상 이런 방어가 없으면 앱이 멈춘다.
+    mutating func expandUserMacro(_ command: String) -> MTMathList? {
+        guard let macro = macros[command] else { return nil }
+        guard macroDepth < MTMathListBuilder.maxMacroDepth else {
+            self.setError(.nestingTooDeep, message: "Macro expansion too deep (\\\(command))")
+            return nil
+        }
+        var body = macro.params > 0 ? macro.body : macro.body
+        if macro.params > 0 {
+            for index in 1...macro.params {
+                let argument = readRawGroup() ?? ""
+                body = body.replacingOccurrences(of: "#\(index)", with: "{\(argument)}")
+            }
+        }
+        macroDepth += 1
+        defer { macroDepth -= 1 }
+
+        var sub = MTMathListBuilder(string: body)
+        sub.macros = macros
+        sub.macroDepth = macroDepth
+        guard let list = sub.build() else {
+            self.error = sub.error
+            return nil
+        }
+        return list
+    }
+
+    /// `\kern 5pt` 처럼 중괄호 없이 오는 치수를 읽는다.
+    mutating func readBareDimension() -> String? {
+        self.skipSpaces()
+        var text = ""
+        while hasCharacters {
+            let ch = string[currentCharIndex]
+            guard ch.isNumber || ch == "." || ch == "-" || ch == "+" || ch.isLetter else { break }
+            text.append(ch)
+            _ = getNextCharacter()
+        }
+        return text.isEmpty ? nil : text
+    }
+
+    /// `1cm` `5pt` `18mu` → mu 값. 단위를 못 읽으면 0(간격 없음)이다.
+    func parseDimensionToMu(_ source: String) -> CGFloat {
+        let trimmed = source.trimmingCharacters(in: .whitespaces)
+        let unit = String(trimmed.suffix(2)).lowercased()
+        guard let factor = MTMathListBuilder.dimensionToMu[unit] else { return 0 }
+        let number = trimmed.dropLast(2).trimmingCharacters(in: .whitespaces)
+        return (Double(number).map { CGFloat($0) } ?? 0) * factor
     }
 
     /// `{…}` 안을 **해석하지 않고 원문 그대로** 읽는다. 중괄호 짝은 맞춘다.
