@@ -89,6 +89,10 @@ final class SyntaxCoverageTests: XCTestCase {
                      #"\text{물} \rightleftharpoons \text{수소이온} + \text{수산화이온}"#),
         ("통계", #"\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i"#,
                 #"\bar{평균} = \frac{1}{n}\sum_{i=1}^{n} 표본_i"#),
+        ("노름 기호", #"\lVert v \rVert + \lvert x \rvert"#, #"\lVert 벡터 \rVert"#),
+        ("이항 변형", #"\dbinom{n}{k} \tbinom{n}{k}"#, #"\dbinom{전체}{선택}"#),
+        ("역·순 극한", #"\varprojlim_{n} A_n \quad \varinjlim_{n} B_n"#, #"\varprojlim_{n} 군_n"#),
+        ("천분율", #"5\permil"#, #"농도 5\permil"#),
         ("긴 혼합식", #"\int_{0}^{\infty} \frac{\sin x}{x} dx = \frac{\pi}{2}"#,
                     #"\int_{0}^{\infty} \frac{\text{진폭}(t)}{t} dt = \frac{\pi}{2} \text{ (수렴)}"#),
     ]

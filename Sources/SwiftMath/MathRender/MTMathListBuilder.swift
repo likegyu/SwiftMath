@@ -891,8 +891,10 @@ public struct MTMathListBuilder {
             frac.numerator = numerator
             frac.denominator = denominator
             return frac;
-        } else if command == "binom" {
+        } else if command == "binom" || command == "dbinom" || command == "tbinom" {
             // A binom command has 2 arguments
+            // \dbinom·\tbinom 은 스타일만 강제하는 변형이다. 조판 스타일 강제는 아직 없으니
+            // 같은 모양으로 그린다 — 표기가 통째로 깨지는 것보다 크기가 조금 다른 게 낫다.
             let frac = MTFraction(hasRule: false)
             frac.numerator = self.buildInternal(true)
             frac.denominator = self.buildInternal(true)

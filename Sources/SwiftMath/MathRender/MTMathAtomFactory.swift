@@ -64,6 +64,12 @@ public class MTMathAtomFactory {
         "||" : "\u{2016}",
         "Vert" : "\u{2016}",
         "vert" : "|",
+        // \left\lVert … \right\rVert 은 구분자 조회에 별칭이 적용되지 않아 실패했다.
+        // 별칭에만 넣지 말고 이 표에도 직접 넣는다.
+        "lVert" : "\u{2016}",
+        "rVert" : "\u{2016}",
+        "lvert" : "|",
+        "rvert" : "|",
         "uparrow" : "\u{2191}",
         "downarrow" : "\u{2193}",
         "updownarrow" : "\u{2195}",
@@ -535,6 +541,12 @@ public class MTMathAtomFactory {
         "vert" : MTMathAtom(type: .ordinary, value: "|"),
         "ldots" : MTMathAtom(type: .ordinary, value: "\u{2026}"),
         "prime" : MTMathAtom(type: .ordinary, value: "\u{2032}"),
+        // \left 없이 홀로 쓰는 노름 기호. \lVert 는 별칭이 Vert 로 풀리는데 Vert 가
+        // 구분자 표에만 있어서 "미지원 명령"이 됐다. 별칭이 닿을 곳을 만들어 준다.
+        "Vert" : MTMathAtom(type: .ordinary, value: "\u{2016}"),
+        // 천분율 — 화학·환경공학 농도 표기에 나온다.
+        "permil" : MTMathAtom(type: .ordinary, value: "\u{2030}"),
+        "perthousand" : MTMathAtom(type: .ordinary, value: "\u{2030}"),
         "hbar" : MTMathAtom(type: .ordinary, value: "\u{210F}"),
         "lbar" : MTMathAtom(type: .ordinary, value: "\u{019B}"),  // NEW ƛ
         "Im" : MTMathAtom(type: .ordinary, value: "\u{2111}"),
@@ -734,6 +746,10 @@ public class MTMathAtomFactory {
         "varliminf" : MTMathAtomFactory.operatorWithName("lim inf", limits: true),
         "varlimsup" : MTMathAtomFactory.operatorWithName("lim sup", limits: true),
         "plim" : MTMathAtomFactory.operatorWithName("plim", limits: true),
+        // 역극한·순극한 — 대수학·위상수학에서 정기적으로 나온다. amsmath 는 lim 아래에
+        // 화살표를 붙이지만, 늘어나는 화살표를 아직 못 그리므로 이름으로 구분한다.
+        "varprojlim" : MTMathAtomFactory.operatorWithName("proj lim", limits: true),
+        "varinjlim" : MTMathAtomFactory.operatorWithName("inj lim", limits: true),
         "cosec" : MTMathAtomFactory.operatorWithName("cosec", limits: false),
         "ch" : MTMathAtomFactory.operatorWithName("ch", limits: false),
         "sh" : MTMathAtomFactory.operatorWithName("sh", limits: false),
