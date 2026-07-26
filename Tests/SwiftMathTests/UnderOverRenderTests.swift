@@ -29,6 +29,12 @@ final class UnderOverRenderTests: XCTestCase {
         (#"\overbrace{속도 + 가속도}^{\text{운동학}}"#, "overbrace — CJK"),
         (#"\idotsint f\,dV"#, "idotsint"),
         (#"a\phantom{XXX}b \quad a\hphantom{XXX}b"#, "phantom / hphantom"),
+        (#"\text{A} \xrightarrow{\text{촉매}} \text{B}"#, "xrightarrow — 화학"),
+        (#"\text{A} \xrightarrow[\Delta]{\text{효소, pH 7}} \text{B}"#, "xrightarrow — 위·아래 라벨"),
+        (#"x \xleftarrow{f} y \quad a \xleftrightarrow{g} b"#, "xleftarrow / xleftrightarrow"),
+        ("\\begin{array}{lcr} 항목 & 기호 & 값 \\\\ 속도 & v & 3 \\\\ 질량 & m & 5 \\end{array}", "array — 열 정렬 l·c·r"),
+        ("\\left[\\begin{array}{cc} a & b \\\\ c & d \\end{array}\\right]", "array + 구분자"),
+        (#"\underrightarrow{AB} \quad \overparen{CD}"#, "under/over 늘어나는 악센트"),
     ]
 
     func testRenderUnderOverSheet() throws {

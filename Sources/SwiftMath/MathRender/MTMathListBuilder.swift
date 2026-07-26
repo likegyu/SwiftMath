@@ -16,9 +16,13 @@ struct MTEnvProperties {
     var ended: Bool
     var numRows: Int
     var alignment: MTColumnAlignment?  // Optional alignment for starred matrix environments
+    /// `\begin{array}{lcr}` 처럼 열마다 따로 지정된 정렬.
+    var columnAlignments: [MTColumnAlignment]?
 
-    init(name: String?, alignment: MTColumnAlignment? = nil) {
+    init(name: String?, alignment: MTColumnAlignment? = nil,
+         columnAlignments: [MTColumnAlignment]? = nil) {
         self.envName = name
+        self.columnAlignments = columnAlignments
         self.numRows = 0
         self.ended = false
         self.alignment = alignment
@@ -829,6 +833,25 @@ public struct MTMathListBuilder {
         return ""
     }
     
+    /// 라벨 폭에 맞춰 늘어나는 화살표들. 화학 반응식(`A \xrightarrow{촉매} B`)에 자주 나온다.
+    static let stretchyArrowCommands: [String: MTStretchyArrowDirection] = [
+        "xrightarrow": .right, "xleftarrow": .left,
+        "xRightarrow": .right, "xLeftarrow": .left,
+        "xleftrightarrow": .both, "xLeftrightarrow": .both,
+        "xrightleftharpoons": .both, "xhookrightarrow": .right, "xhookleftarrow": .left,
+        "xmapsto": .right, "xlongequal": .both,
+    ]
+
+    /// 내용 폭에 맞춰 늘어나는 악센트. `isOver` 가 위/아래를 가른다.
+    /// `\overrightarrow` 는 이미 MTAccent 로 구현돼 있어 여기 없다.
+    static let stretchyAccentGlyphs: [String: (glyph: String, isOver: Bool)] = [
+        "underrightarrow": ("\u{2192}", false), "underleftarrow": ("\u{2190}", false),
+        "underleftrightarrow": ("\u{2194}", false),
+        "underparen": ("\u{23DD}", false),      // BOTTOM PARENTHESIS
+        "overparen": ("\u{23DC}", true),        // TOP PARENTHESIS
+        "overbracket": ("\u{23B4}", true), "underbracket": ("\u{23B5}", false),
+    ]
+
     /// 내용 위에 선을 덧그리는 명령들. `\fbox` 는 본문용이지만 수식 안에서도 자주 쓰인다.
     static let decorationKinds: [String: MTDecorated.Kind] = [
         "boxed": .boxed, "fbox": .boxed, "framebox": .boxed,
@@ -1019,6 +1042,28 @@ public struct MTMathListBuilder {
             let under = MTUnderLine()
             under.innerList = self.buildInternal(true)
             return under
+        } else if let direction = MTMathListBuilder.stretchyArrowCommands[command] {
+            // \xrightarrow[아래]{위} — 대괄호 인자는 선택, 중괄호 인자는 필수.
+            // 중괄호와 방향이 반대다: 화살표가 두 라벨 중 넓은 쪽에 맞춰 늘어난다.
+            let underOver = MTUnderOver()
+            underOver.stretchyArrow = direction
+            underOver.type = .relation      // 화살표는 관계연산자 자리에 온다
+            self.skipSpaces()
+            if hasCharacters, string[currentCharIndex] == "[" {
+                _ = getNextCharacter()
+                underOver.under = self.buildInternal(false, stopChar: "]")
+            }
+            underOver.over = self.buildInternal(true)
+            return underOver
+        } else if let accent = MTMathListBuilder.stretchyAccentGlyphs[command] {
+            // \underrightarrow·\overparen 계열 — 내용 폭에 맞춰 늘어나는 악센트.
+            // MTAccent 는 위쪽만 다루므로 MTUnderOver 의 늘어나는 글리프로 만든다.
+            guard let body = self.buildInternal(true) else { return nil }
+            let underOver = MTUnderOver()
+            underOver.innerList = body
+            if accent.isOver { underOver.stretchyOver = accent.glyph }
+            else { underOver.stretchyUnder = accent.glyph }
+            return underOver
         } else if command == "overbrace" || command == "underbrace" {
             // 본체 폭에 맞춰 늘어나는 중괄호. `\overbrace{x}^{설명}` 처럼 뒤에 붙는 첨자는
             // 중괄호 **위/아래 가운데**로 가야 하므로(LaTeX 는 \mathop 으로 펼친다) 여기서
@@ -1126,7 +1171,21 @@ public struct MTMathListBuilder {
             if env == nil {
                 return nil;
             }
-            let table = self.buildTable(env: env, firstList:nil, isRow:false)
+            // array·subarray 는 열 지정이 **필수 인자**다: \begin{array}{cc}
+            var columnAlignments: [MTColumnAlignment]? = nil
+            if env == "array" || env == "subarray" {
+                columnAlignments = self.readColumnSpec()
+                if columnAlignments == nil { return nil }
+            }
+            // 별표형 행렬(matrix* 등)은 대괄호로 정렬을 한 번에 받는다.
+            var alignment: MTColumnAlignment? = nil
+            if env!.hasSuffix("*") {
+                alignment = self.readOptionalAlignment()
+                if self.error != nil { return nil }
+            }
+            let table = self.buildTable(env: env, alignment: alignment,
+                                        columnAlignments: columnAlignments,
+                                        firstList: nil, isRow: false)
             return table
         } else if command == "color" {
             // A color command has 2 arguments
@@ -1616,6 +1675,49 @@ public struct MTMathListBuilder {
     }
 
     /// Reads optional alignment parameter for starred matrix environments: [r], [l], or [c]
+    /// `\begin{array}{lcr|}` 의 열 지정을 읽는다.
+    ///
+    /// `l`·`c`·`r` 만 정렬로 받고, 세로줄(`|`)과 열 사이 삽입(`@{…}`)은 **건너뛴다** —
+    /// 조판기가 표에 세로줄을 그릴 방법이 없어서, 받아 봐야 못 지킨다. 무시하고 내용을
+    /// 살리는 쪽이 통째로 실패하는 것보다 낫다.
+    mutating func readColumnSpec() -> [MTColumnAlignment]? {
+        self.skipSpaces()
+        guard hasCharacters, string[currentCharIndex] == "{" else {
+            self.setError(.characterNotFound, message: "Missing column specification for array")
+            return nil
+        }
+        _ = getNextCharacter()   // '{'
+
+        var alignments = [MTColumnAlignment]()
+        while hasCharacters {
+            let ch = getNextCharacter()
+            switch ch {
+            case "}":  return alignments
+            case "l":  alignments.append(.left)
+            case "c":  alignments.append(.center)
+            case "r":  alignments.append(.right)
+            case "|", " ":
+                continue     // 세로줄·공백은 무시
+            case "@", "p", "m", "b":
+                // @{…}, p{너비} 등은 인자를 하나 더 먹는다. 통째로 건너뛴다.
+                self.skipSpaces()
+                if hasCharacters, string[currentCharIndex] == "{" {
+                    _ = getNextCharacter()
+                    var depth = 1
+                    while hasCharacters && depth > 0 {
+                        let c = getNextCharacter()
+                        if c == "{" { depth += 1 } else if c == "}" { depth -= 1 }
+                    }
+                }
+                if ch != "@" { alignments.append(.left) }   // p/m/b 는 한 열을 만든다
+            default:
+                continue     // 모르는 글자는 무시 — 열 지정 하나로 수식을 버리지 않는다
+            }
+        }
+        self.setError(.characterNotFound, message: "Missing } in array column specification")
+        return nil
+    }
+
     mutating func readOptionalAlignment() -> MTColumnAlignment? {
         self.skipSpaces()
 
@@ -1665,11 +1767,13 @@ public struct MTMathListBuilder {
         assert(ch >= "\u{21}", "Expected non-space character \(ch)")
     }
     
-    mutating func buildTable(env: String?, alignment: MTColumnAlignment? = nil, firstList: MTMathList?, isRow: Bool) -> MTMathAtom? {
+    mutating func buildTable(env: String?, alignment: MTColumnAlignment? = nil,
+                             columnAlignments: [MTColumnAlignment]? = nil,
+                             firstList: MTMathList?, isRow: Bool) -> MTMathAtom? {
         // Save the current env till an new one gets built.
         let oldEnv = self.currentEnv
 
-        currentEnv = MTEnvProperties(name: env, alignment: alignment)
+        currentEnv = MTEnvProperties(name: env, alignment: alignment, columnAlignments: columnAlignments)
         
         var currentRow = 0
         var currentCol = 0
@@ -1707,7 +1811,10 @@ public struct MTMathListBuilder {
         }
         
         var error:NSError? = self.error
-        let table = MTMathAtomFactory.table(withEnvironment: currentEnv?.envName, alignment: currentEnv?.alignment, rows: rows, error: &error)
+        let table = MTMathAtomFactory.table(withEnvironment: currentEnv?.envName,
+                                            alignment: currentEnv?.alignment,
+                                            columnAlignments: currentEnv?.columnAlignments,
+                                            rows: rows, error: &error)
         if table == nil && self.error == nil {
             self.error = error
             return nil

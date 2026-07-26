@@ -582,6 +582,11 @@ public class MTUnderLine: MTMathAtom {
     }
 }
 
+/// `\xrightarrow` 계열 화살표가 가리키는 방향.
+public enum MTStretchyArrowDirection {
+    case right, left, both
+}
+
 // MARK: - MTUnderOver
 
 /// 본체 위·아래에 내용을 쌓는 원자 — `\overset{위}{본체}`, `\underset{아래}{본체}`,
@@ -606,6 +611,10 @@ public class MTUnderOver: MTMathAtom {
     public var stretchyOver: String?
     /// `\underbrace` 용. 아래쪽 늘어나는 글리프.
     public var stretchyUnder: String?
+    /// 본체 자리에 **라벨 폭만큼 늘어나는 화살표**를 놓는다 — `\xrightarrow` 계열.
+    /// 중괄호와 방향이 반대다. 저쪽은 본체에 맞춰 장식이 늘고, 이쪽은 장식(라벨)에 맞춰
+    /// 본체가 는다.
+    public var stretchyArrow: MTStretchyArrowDirection?
 
     override public var finalized: MTMathAtom {
         let newUnderOver = super.finalized as! MTUnderOver
@@ -625,6 +634,7 @@ public class MTUnderOver: MTMathAtom {
         self.under = underOver?.under != nil ? MTMathList(underOver!.under) : nil
         self.stretchyOver = underOver?.stretchyOver
         self.stretchyUnder = underOver?.stretchyUnder
+        self.stretchyArrow = underOver?.stretchyArrow
     }
 
     override init() {

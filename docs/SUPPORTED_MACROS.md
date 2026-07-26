@@ -18,11 +18,9 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 | 매크로 | 이유 | 대신 |
 |---|---|---|
-| `\xrightarrow` `\xleftarrow` | 라벨 폭에 맞춰 화살표를 늘려야 한다 | `\stackrel{라벨}{\longrightarrow}` |
 | `\ce{...}` (mhchem) | LaTeX가 아닌 별도 DSL이다 | `\text{H}_2\text{O}` 처럼 일반 LaTeX로 |
 | `\SI{}{}` (siunitx) | 위와 같음 | `3\,\text{m}` |
-| `\underrightarrow` | 밑에 붙는 늘어나는 악센트 | `\underset{\rightarrow}{x}` |
-| `\begin{array}` `\begin{alignat}` `\begin{subarray}` `\begin{gathered}` | 미구현 환경 | `aligned` `cases` `pmatrix` `vmatrix` 는 된다 |
+| `\begin{alignat}` | 열 수 인자를 받는 정렬 환경 | `aligned` 로 |
 
 **모르는 명령을 만나면** 파서가 `Invalid command \foo` 오류를 낸다. 소비자 앱은 보통
 그 명령만 지우고 다시 시도하거나(자가치유), 그래도 안 되면 원문을 그대로 보여준다.
@@ -62,13 +60,21 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 `\cancel{}` (↗) `\bcancel{}` (↘) `\xcancel{}` (×) — 취소선, 크기를 바꾸지 않는다
 `\overline{}` `\underline{}`
 
-### 늘어나는 중괄호
+### 늘어나는 중괄호·악센트·화살표
 
 `\overbrace{내용}^{라벨}` `\underbrace{내용}_{라벨}`
+`\overparen{}` `\underparen{}` `\overbracket{}` `\underbracket{}`
+`\underrightarrow{}` `\underleftarrow{}` `\underleftrightarrow{}`
 
 중괄호는 내용 폭에 맞춰 늘어난다. 폰트의 가로 변형 8단계(라틴 모던 기준 4.01em)를 쓰고,
 그보다 넓으면 가장 큰 변형을 가로로 늘인다 — 아주 넓어지면 끝 곡선이 다소 퍼진다.
 뒤따르는 `^`(overbrace) · `_`(underbrace)는 **중괄호 위/아래 가운데** 라벨이 된다.
+
+`\xrightarrow[아래]{위}` `\xleftarrow` `\xleftrightarrow` `\xRightarrow` `\xhookrightarrow`
+`\xmapsto` `\xrightleftharpoons` `\xlongequal`
+
+화살표는 **라벨 폭에 맞춰** 늘어난다. 글리프를 늘이지 않고 축선과 촉을 직접 그리므로
+어떤 폭에서도 획 굵기가 일정하다(폰트의 화살표 가로 변형은 1.46em 이 한계라 못 쓴다).
 
 ### 자리 맞춤
 
@@ -90,8 +96,13 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 ### 환경
 
-`aligned` `cases` `matrix` `pmatrix` `bmatrix` `Bmatrix` `vmatrix` `Vmatrix`
-(별표형 `matrix*` 등은 열 정렬 지정을 받는다)
+`aligned` `cases` `gather` `gathered` `displaylines` `eqnarray` `split` `eqalign`
+`matrix` `pmatrix` `bmatrix` `Bmatrix` `vmatrix` `Vmatrix` `smallmatrix`
+(별표형 `matrix*` 등은 대괄호로 열 정렬을 받는다)
+
+`\begin{array}{lcr}` · `\begin{subarray}{c}` — 열마다 `l`·`c`·`r` 로 정렬을 지정한다.
+세로줄(`|`)과 `@{}`·`p{}` 는 **읽고 무시한다** — 표에 세로줄을 그릴 방법이 없어서,
+받아 봐야 못 지키느니 내용을 살리는 쪽을 골랐다. 열 수로는 세지 않는다.
 
 ### 큰 연산자
 
@@ -148,3 +159,10 @@ let font = MTFontManager.fontManager.latinModernFont(withSize: 20)!
   프로세스가 죽는 대신 `MTParseErrors.nestingTooDeep` 오류를 낸다. 신뢰할 수 없는 입력
   (LLM이 만든 LaTeX)을 렌더할 때 필요하다.
 - 어긋난 중괄호·짝 없는 `\left` 등은 오류로 돌아오며 크래시하지 않는다.
+
+## 알려진 한계
+
+- **스타일 명령이 크기를 바꾸지 않는다.** `\scriptstyle`·`\displaystyle` 은 파싱되고
+  추적되지만 글자 크기에 반영되지 않는다(실측: `{\scriptstyle i<n}` 과 `i<n` 의 폭이 같고
+  `smallmatrix` 도 `matrix` 와 같다). 첨자·분수처럼 **조판기가 직접 크기를 정하는 경로**는
+  정상이므로, `\sum_{\begin{subarray}…}` 같은 실사용은 제대로 작게 나온다.

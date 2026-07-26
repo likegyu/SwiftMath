@@ -1331,15 +1331,51 @@ class MTTypesetter {
     func makeUnderOver(_ underOver: MTUnderOver?) -> MTDisplay? {
         guard let underOver else { return nil }
 
-        let nucleus = MTTypesetter.createLineForMathList(
+        var nucleus = MTTypesetter.createLineForMathList(
             underOver.innerList, font: font, style: style, cramped: cramped)
             ?? MTMathListDisplay(withDisplays: [], range: underOver.indexRange)
 
         // 위·아래가 모두 없으면 본체만 돌려준다 — 빈 장식으로 높이를 늘릴 이유가 없다.
         guard underOver.over != nil || underOver.under != nil
-                || underOver.stretchyOver != nil || underOver.stretchyUnder != nil else {
+                || underOver.stretchyOver != nil || underOver.stretchyUnder != nil
+                || underOver.stretchyArrow != nil else {
             nucleus.position = currentPosition
             return nucleus
+        }
+
+        // 라벨은 **딱 한 번만** 조판한다. 폭을 재려고 한 번, 그리려고 또 한 번 부르면
+        // 전처리의 원자 융합(prevNode.fuse)이 원본 리스트를 두 번 건드려 글자가 겹친다
+        // (실측: `\xrightarrow{\text{촉매}}` → "촉매매").
+        let scriptStyle = self.scriptStyle()
+        let scriptFont = font.copy(withSize: MTTypesetter.getStyleSize(scriptStyle, font: font))
+        let over = underOver.over.flatMap {
+            MTTypesetter.createLineForMathList($0, font: scriptFont, style: scriptStyle,
+                                               cramped: self.superScriptCramped())
+        }
+        let under = underOver.under.flatMap {
+            MTTypesetter.createLineForMathList($0, font: scriptFont, style: scriptStyle,
+                                               cramped: self.subscriptCramped())
+        }
+
+        // 늘어나는 화살표는 방향이 반대다 — 라벨 폭에 맞춰 **본체**가 늘어난다.
+        if let direction = underOver.stretchyArrow {
+            let overWidth = over?.width ?? 0
+            let underWidth = under?.width ?? 0
+            let mathTable = styleFont.mathTable
+            let minimum = styleFont.fontSize * 1.5     // 라벨이 없어도 화살표 꼴은 유지한다
+            let padding = styleFont.fontSize * 0.35    // 라벨이 촉에 닿지 않게
+            let arrow = MTStretchyArrowDisplay(direction: direction, position: currentPosition,
+                                               range: underOver.indexRange)
+            arrow.width = max(minimum, max(overWidth, underWidth) + padding * 2)
+            arrow.lineThickness = mathTable?.fractionRuleThickness ?? (styleFont.fontSize / 20)
+            arrow.headLength = styleFont.fontSize * 0.3
+            arrow.axisHeight = mathTable?.axisHeight ?? (styleFont.fontSize * 0.25)
+            arrow.ascent = arrow.axisHeight + arrow.headLength * 0.45
+            arrow.descent = max(0, arrow.headLength * 0.45 - arrow.axisHeight)
+            nucleus = MTMathListDisplay(withDisplays: [arrow], range: underOver.indexRange)
+            nucleus.width = arrow.width
+            nucleus.ascent = arrow.ascent
+            nucleus.descent = arrow.descent
         }
 
         // 늘어나는 글리프(중괄호)를 먼저 본체 위/아래에 붙인다. 라벨이 있으면 그 바깥에
@@ -1359,17 +1395,6 @@ class MTTypesetter {
                 else { stack.lowerLimitGap = mathTable.underbarVerticalGap }
             }
             base = stack
-        }
-
-        let scriptStyle = self.scriptStyle()
-        let scriptFont = font.copy(withSize: MTTypesetter.getStyleSize(scriptStyle, font: font))
-        let over = underOver.over.flatMap {
-            MTTypesetter.createLineForMathList($0, font: scriptFont, style: scriptStyle,
-                                               cramped: self.superScriptCramped())
-        }
-        let under = underOver.under.flatMap {
-            MTTypesetter.createLineForMathList($0, font: scriptFont, style: scriptStyle,
-                                               cramped: self.subscriptCramped())
         }
 
         // 라벨이 하나도 없으면(중괄호만 있는 `\overbrace{x}`) 여기서 끝난다.

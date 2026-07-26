@@ -891,6 +891,59 @@ class MTBoxDisplay: MTDisplay {
     }
 }
 
+// MARK: - MTStretchyArrowDisplay
+
+/// `\xrightarrow` 계열 — 라벨 폭에 맞춰 임의로 늘어나는 화살표.
+///
+/// 글리프를 늘리지 않고 **직접 그린다.** 라틴 모던의 화살표는 가로 변형이 2단계(최대
+/// 1.46em)뿐이라 라벨 폭을 따라갈 수 없고, 가장 큰 변형을 가로로 늘이면 화살촉까지
+/// 같이 뚱뚱해진다. 축선과 촉을 따로 그리면 어떤 폭에서도 획 굵기가 일정하다.
+class MTStretchyArrowDisplay: MTDisplay {
+    typealias Direction = MTStretchyArrowDirection
+
+    var direction: Direction = .right
+    var lineThickness: CGFloat = 0
+    /// 화살촉 한 변의 길이.
+    var headLength: CGFloat = 0
+    /// 축선이 놓이는 높이(보통 수식 축 높이).
+    var axisHeight: CGFloat = 0
+
+    init(direction: Direction, position: CGPoint, range: NSRange) {
+        super.init()
+        self.direction = direction
+        self.position = position
+        self.range = range
+    }
+
+    override func draw(_ context: CGContext) {
+        super.draw(context)
+        context.saveGState()
+        self.textColor?.setStroke()
+
+        let y = position.y + axisHeight
+        let left = position.x, right = position.x + width
+        let path = MTBezierPath()
+        path.move(to: CGPointMake(left, y))
+        path.addLine(to: CGPointMake(right, y))
+
+        // 화살촉은 축선 끝에서 안쪽으로 비스듬히 두 획.
+        let dy = headLength * 0.45
+        if direction == .right || direction == .both {
+            path.move(to: CGPointMake(right - headLength, y + dy))
+            path.addLine(to: CGPointMake(right, y))
+            path.addLine(to: CGPointMake(right - headLength, y - dy))
+        }
+        if direction == .left || direction == .both {
+            path.move(to: CGPointMake(left + headLength, y + dy))
+            path.addLine(to: CGPointMake(left, y))
+            path.addLine(to: CGPointMake(left + headLength, y - dy))
+        }
+        path.lineWidth = lineThickness
+        path.stroke()
+        context.restoreGState()
+    }
+}
+
 // MARK: - MTMaskedDisplay
 
 /// `\phantom` 계열과 `\smash` — 내용을 감추거나 신고 치수를 줄인다.

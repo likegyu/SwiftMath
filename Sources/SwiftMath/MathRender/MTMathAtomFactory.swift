@@ -1210,7 +1210,9 @@ public class MTMathAtomFactory {
      - `cases`: 1 or 2 columns, left-aligned
      - `eqnarray`: Exactly 3 columns with r-c-l alignment
      */
-    public static func table(withEnvironment env: String?, alignment: MTColumnAlignment? = nil, rows: [[MTMathList]], error:inout NSError?) -> MTMathAtom? {
+    public static func table(withEnvironment env: String?, alignment: MTColumnAlignment? = nil,
+                             columnAlignments: [MTColumnAlignment]? = nil,
+                             rows: [[MTMathList]], error:inout NSError?) -> MTMathAtom? {
         let table = MTMathTable(environment: env)
 
         for i in 0..<rows.count {
@@ -1292,6 +1294,36 @@ public class MTMathAtomFactory {
                     table.set(alignment: col % 2 == 0 ? .right : .left, forColumn: col)
                 }
 
+                return table
+            } else if env == "array" || env == "subarray" {
+                // 조판은 MTMathTable 이 이미 다 한다. 없던 건 열 지정(`{lcr}`) 파서뿐이었다.
+                table.interRowAdditionalSpacing = 0
+                table.interColumnSpacing = env == "subarray" ? 0 : 18
+                for col in 0..<table.numColumns {
+                    // 지정이 모자라면 남는 열은 가운데로 둔다. LaTeX 는 오류지만 여기서는
+                    // 내용을 살리는 쪽을 고른다.
+                    let align = (columnAlignments?.indices.contains(col) ?? false)
+                        ? columnAlignments![col] : .center
+                    table.set(alignment: align, forColumn: col)
+                }
+                // subarray 는 열 간격이 없다는 점만 array 와 다르다. 크기 축소는 넣지 않았다 —
+                // 이 렌더러는 MTMathStyle(.script) 을 폭에 반영하지 않아서(실측: `\scriptstyle`,
+                // `smallmatrix` 도 마찬가지) 넣어도 아무 일이 없고, 코드만 오해를 부른다.
+                // 실사용인 `\sum_{\begin{subarray}…}` 는 첨자 경로가 script 폰트로 조판하므로
+                // 이미 작게 나온다.
+                return table
+            } else if env == "gathered" {
+                // gather 의 인라인 판 — 한 열 가운데 정렬.
+                if table.numColumns > 1 {
+                    let message = "gathered environment can only have 1 column"
+                    if error == nil {
+                        error = NSError(domain: MTParseError, code: MTParseErrors.invalidNumColumns.rawValue, userInfo: [NSLocalizedDescriptionKey:message])
+                    }
+                    return nil
+                }
+                table.interRowAdditionalSpacing = 1
+                table.interColumnSpacing = 0
+                if table.numColumns > 0 { table.set(alignment: .center, forColumn: 0) }
                 return table
             } else if env == "displaylines" || env == "gather" {
                 if table.numColumns != 1 {
