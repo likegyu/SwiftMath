@@ -1789,6 +1789,26 @@ public struct MTMathListBuilder {
             let glyph = name.flatMap { MTMathAtomFactory.delimiters[$0] } ?? "|"
             return MTMathList(atom: MTMathAtom(type: .ordinary, value: glyph))
 
+        case "mathord", "mathbin", "mathrel", "mathop", "mathopen", "mathclose", "mathpunct":
+            // 원자의 **간격 등급**을 바꾼다. 표준 LaTeX 인데 없었다.
+            // 화학 결합선이 대표적인 쓰임이다 — `=` 는 어디서든 관계연산자로 잡혀
+            // 양쪽에 5mu 가 붙는데, 결합선은 원자에 바짝 붙어야 한다.
+            guard let sublist = self.buildInternal(true) else { return nil }
+            let newType: MTMathAtomType
+            switch command {
+            case "mathbin":   newType = .binaryOperator
+            case "mathrel":   newType = .relation
+            case "mathop":    newType = .largeOperator
+            case "mathopen":  newType = .open
+            case "mathclose": newType = .close
+            case "mathpunct": newType = .punctuation
+            default:          newType = .ordinary
+            }
+            // 원자가 하나일 때만 등급을 바꾼다. 여럿이면 무엇의 등급인지 모호해서
+            // 건드리지 않는다 — 내용을 잃는 것보다 간격이 조금 다른 게 낫다.
+            if sublist.atoms.count == 1 { sublist.atoms[0].type = newType }
+            return sublist
+
         case "notag", "nonumber":
             // 번호를 붙이지 않는다는 지시. 앱에는 번호가 없으니 아무 일도 하지 않는다.
             // 다만 **오류를 내면 안 된다** — 수식 하나가 통째로 날아간다.

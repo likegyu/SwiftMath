@@ -53,10 +53,15 @@ enum MTChemFormula {
                 previousWasFormulaUnit = false
 
             case "+":
-                // 화학식 사이의 + 는 이항연산자로 둔다.
-                out += " + "
+                // mhchem 은 공백으로 가른다 — `H+` 는 **전하**(H⁺)고 `A + B` 는 구분자다.
+                // 실제 교재 표기 `\ce{H3PO4 <=> H2PO4^- + H+}` 에서 둘이 한 줄에 같이 나온다.
+                if previousWasFormulaUnit && i > 0 && chars[i - 1] != " " {
+                    out += "^{+}"
+                } else {
+                    out += " + "
+                    previousWasFormulaUnit = false
+                }
                 i += 1
-                previousWasFormulaUnit = false
 
             case "*", "·":
                 out += " \\cdot "     // 수화물: CuSO4*5H2O
@@ -98,9 +103,14 @@ enum MTChemFormula {
 
             case "-", "=", "#":
                 // 원자 사이의 결합선. 홑·겹·삼중 결합.
-                out += c == "-" ? "\\text{–}" : (c == "=" ? "=" : "\\equiv ")
+                //
+                // **정립 텍스트로 낸다.** 그냥 `=` 로 두면 관계연산자가 되어 양쪽에 5mu 씩
+                // 붙는데, 결합선은 원자에 바짝 붙어야 한다(실측: `\ce{CH2=CH2}` 가
+                // `CH₂ = CH₂` 로 벌어졌다).
+                out += c == "-" ? "\\text{–}"
+                     : (c == "=" ? "\\mathord{=}" : "\\mathord{\u{2261}}")
                 i += 1
-                previousWasFormulaUnit = false
+                previousWasFormulaUnit = true
 
             default:
                 if c.isNumber {

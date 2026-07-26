@@ -63,6 +63,24 @@ final class ScienceNotationTests: XCTestCase {
         XCTAssertTrue(both.contains(#"\xrightarrow[\text{아래}]{\text{위}}"#), both)
     }
 
+    /// 붙은 `+` 는 전하, 띄운 `+` 는 구분자다. 실제 교재(OpenStax 유기화학 63쪽)의
+    /// `\ce{H3PO4 <=> H2PO4^- + H+}` 에서 둘이 한 줄에 같이 나온다.
+    func testAttachedPlusIsChargeSpacedPlusIsSeparator() {
+        XCTAssertEqual(MTChemFormula.toLatex("H+"), #"\text{H}^{+}"#)
+        XCTAssertEqual(MTChemFormula.toLatex("Na+"), #"\text{Na}^{+}"#)
+        let mixed = MTChemFormula.toLatex("H2PO4^- + H+")
+        XCTAssertTrue(mixed.contains(" + "), "띄운 +가 구분자로 안 나왔다: \(mixed)")
+        XCTAssertTrue(mixed.hasSuffix("^{+}"), "붙은 +가 전하로 안 나왔다: \(mixed)")
+    }
+
+    /// 결합선 `=` 는 관계연산자가 아니다 — 원자에 바짝 붙어야 한다.
+    func testDoubleBondIsTight() throws {
+        let bond = try display(#"\ce{CH2=CH2}"#)
+        let relation = try display(#"\text{CH}_2 = \text{CH}_2"#)
+        XCTAssertLessThan(bond.width, relation.width,
+                          "이중결합에 관계연산자 간격이 붙었다")
+    }
+
     func testHydrateDot() {
         XCTAssertTrue(MTChemFormula.toLatex("CuSO4*5H2O").contains("\\cdot"))
     }
