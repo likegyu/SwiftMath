@@ -42,6 +42,13 @@ final class CJKSerifFallbackTests: XCTestCase {
         // 한글은 상용 밖 음절까지 — 서브셋에서 음절을 덜어내지 않았음을 확인한다.
         XCTAssertTrue(hasGlyphs(kr, "운동에너지속도밀도"), "KR: 기본 한글 누락")
         XCTAssertTrue(hasGlyphs(kr, "뷁뷀꿹뾃"), "KR: 상용 밖 음절 누락 — 서브셋이 과했다")
+        // 중세국어: 조합형 옛자모와 방점. iOS 시스템 폰트에는 하나도 없어서 여기 없으면
+        // 중세국어를 그릴 방법이 아예 사라진다.
+        XCTAssertTrue(hasGlyphs(kr, "\u{110A}\u{119E}\u{1140}\u{1159}\u{112B}\u{11F0}"),
+                      "KR: 옛한글 자모 누락")
+        XCTAssertTrue(hasGlyphs(kr, "\u{302E}\u{302F}"), "KR: 방점 누락")
+        // 한자 — 중세국어는 한자 혼용이 기본이다(훈민정음 언해·두시언해).
+        XCTAssertTrue(hasGlyphs(kr, "訓民正音諺解杜詩中國"), "KR: 한자 누락")
         XCTAssertTrue(hasGlyphs(sc, "国学汉语过说这门为电脑"), "SC: 상용 간체 누락")
     }
 
