@@ -502,6 +502,15 @@ public struct MTMathListBuilder {
                     continue
                 }
                 
+                // \ce·\SI 는 별도 문법이라 원문을 통째로 받아 LaTeX 로 옮긴 뒤 다시 파싱한다.
+                // 원자 하나가 아니라 리스트가 나오므로 여기서 바로 이어 붙인다.
+                if let sublist = self.expandScienceNotation(command) {
+                    prevAtom = sublist.atoms.last
+                    list.append(sublist)
+                    if oneCharOnly { return list }
+                    continue
+                }
+
                 if let fontStyle = MTMathAtomFactory.fontStyleWithName(command) {
                     let oldSpacesAllowed = spacesAllowed
                     // Text has special consideration where it allows spaces without escaping.
@@ -1680,6 +1689,74 @@ public struct MTMathListBuilder {
     /// `l`·`c`·`r` 만 정렬로 받고, 세로줄(`|`)과 열 사이 삽입(`@{…}`)은 **건너뛴다** —
     /// 조판기가 표에 세로줄을 그릴 방법이 없어서, 받아 봐야 못 지킨다. 무시하고 내용을
     /// 살리는 쪽이 통째로 실패하는 것보다 낫다.
+    /// `\ce`·`\SI`·`\si`·`\num` 을 LaTeX 로 옮겨 리스트로 만든다. 해당 명령이 아니면 nil.
+    mutating func expandScienceNotation(_ command: String) -> MTMathList? {
+        switch command {
+        case "ce":
+            guard let source = readRawGroup() else { return nil }
+            return parseTranspiled(MTChemFormula.toLatex(source), fallback: source)
+
+        case "SI", "qty":
+            guard let value = readRawGroup(), let unit = readRawGroup() else { return nil }
+            return parseTranspiled(MTUnitNotation.toLatex(value: value, unit: unit),
+                                   fallback: "\(value) \(unit)")
+
+        case "si", "unit":
+            guard let unit = readRawGroup() else { return nil }
+            return parseTranspiled(MTUnitNotation.units(unit), fallback: unit)
+
+        case "num":
+            guard let value = readRawGroup() else { return nil }
+            return parseTranspiled(MTUnitNotation.number(value), fallback: value)
+
+        case "SIrange", "numrange", "qtyrange":
+            // \SIrange{1}{2}{\meter} → 1–2 m
+            guard let from = readRawGroup(), let to = readRawGroup() else { return nil }
+            let unit = (command == "numrange") ? nil : readRawGroup()
+            let range = "\(MTUnitNotation.number(from))\u{2013}\(MTUnitNotation.number(to))"
+            let latex = unit.map { "\(range)\\,\(MTUnitNotation.units($0))" } ?? range
+            return parseTranspiled(latex, fallback: "\(from)-\(to)")
+
+        default:
+            return nil
+        }
+    }
+
+    /// `{…}` 안을 **해석하지 않고 원문 그대로** 읽는다. 중괄호 짝은 맞춘다.
+    ///
+    /// `\ce`·`\SI` 는 LaTeX 가 아닌 별도 문법이라, 일반 파서에 태우기 전에 원문을
+    /// 통째로 받아 옮겨야 한다.
+    mutating func readRawGroup() -> String? {
+        self.skipSpaces()
+        guard hasCharacters, string[currentCharIndex] == "{" else { return nil }
+        _ = getNextCharacter()
+
+        var text = ""
+        var depth = 1
+        while hasCharacters {
+            let ch = getNextCharacter()
+            if ch == "{" { depth += 1 }
+            if ch == "}" { depth -= 1; if depth == 0 { return text } }
+            text.append(ch)
+        }
+        self.setError(.mismatchBraces, message: "Missing } in argument")
+        return nil
+    }
+
+    /// 옮긴 LaTeX 를 파싱해 리스트로 만든다. 실패하면 원문을 정립 텍스트로 보여 준다 —
+    /// 화학식 하나 때문에 수식 전체를 잃지 않는 게 우선이다.
+    func parseTranspiled(_ latex: String, fallback: String) -> MTMathList {
+        var error: NSError?
+        if let list = MTMathListBuilder.build(fromString: latex, error: &error), error == nil {
+            return list
+        }
+        let escaped = fallback.replacingOccurrences(of: "{", with: "")
+            .replacingOccurrences(of: "}", with: "")
+        var fallbackError: NSError?
+        return MTMathListBuilder.build(fromString: "\\text{\(escaped)}", error: &fallbackError)
+            ?? MTMathList()
+    }
+
     mutating func readColumnSpec() -> [MTColumnAlignment]? {
         self.skipSpaces()
         guard hasCharacters, string[currentCharIndex] == "{" else {
