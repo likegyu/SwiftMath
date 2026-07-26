@@ -891,6 +891,42 @@ class MTBoxDisplay: MTDisplay {
     }
 }
 
+// MARK: - MTMaskedDisplay
+
+/// `\phantom` 계열과 `\smash` — 내용을 감추거나 신고 치수를 줄인다.
+///
+/// 치수(width/ascent/descent)는 조판기가 종류에 맞춰 직접 넣는다. 이 클래스가 하는 일은
+/// **그릴지 말지**와 안쪽 위치 맞추기뿐이다.
+class MTMaskedDisplay: MTDisplay {
+    var inner: MTMathListDisplay?
+    /// false 면 자리만 차지하고 아무것도 안 그린다(`\phantom`).
+    var drawsContent = false
+
+    init(withInner inner: MTMathListDisplay?, drawsContent: Bool, position: CGPoint, range: NSRange) {
+        super.init()
+        self.inner = inner
+        self.drawsContent = drawsContent
+        self.position = position
+        self.range = range
+    }
+
+    override var textColor: MTColor? {
+        set { super.textColor = newValue; inner?.textColor = newValue }
+        get { super.textColor }
+    }
+
+    override var position: CGPoint {
+        set { super.position = newValue; inner?.position = newValue }
+        get { super.position }
+    }
+
+    override func draw(_ context: CGContext) {
+        super.draw(context)
+        guard drawsContent else { return }
+        self.inner?.draw(context)
+    }
+}
+
 // MARK: - MTCancelDisplay
 
 /// `\cancel`·`\bcancel`·`\xcancel` — 내용을 가로지르는 사선.

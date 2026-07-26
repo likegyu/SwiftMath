@@ -18,12 +18,9 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 | 매크로 | 이유 | 대신 |
 |---|---|---|
-| `\overbrace` `\underbrace` | 가로로 늘어나는 중괄호 글리프 조립(MATH 표의 수평 assembly)이 없다 | `\underset` 으로 아래에 설명을 달거나 말로 풀어 쓴다 |
 | `\xrightarrow` `\xleftarrow` | 라벨 폭에 맞춰 화살표를 늘려야 한다 | `\stackrel{라벨}{\longrightarrow}` |
 | `\ce{...}` (mhchem) | LaTeX가 아닌 별도 DSL이다 | `\text{H}_2\text{O}` 처럼 일반 LaTeX로 |
 | `\SI{}{}` (siunitx) | 위와 같음 | `3\,\text{m}` |
-| `\phantom` `\hphantom` `\vphantom` `\smash` `\mathstrut` | 자리 맞춤용 보이지 않는 상자 | 대개 없어도 된다 |
-| `\idotsint` | 단일 코드포인트가 없다 | `\int\cdots\int` |
 | `\underrightarrow` | 밑에 붙는 늘어나는 악센트 | `\underset{\rightarrow}{x}` |
 | `\begin{array}` `\begin{alignat}` `\begin{subarray}` `\begin{gathered}` | 미구현 환경 | `aligned` `cases` `pmatrix` `vmatrix` 는 된다 |
 
@@ -65,6 +62,19 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 `\cancel{}` (↗) `\bcancel{}` (↘) `\xcancel{}` (×) — 취소선, 크기를 바꾸지 않는다
 `\overline{}` `\underline{}`
 
+### 늘어나는 중괄호
+
+`\overbrace{내용}^{라벨}` `\underbrace{내용}_{라벨}`
+
+중괄호는 내용 폭에 맞춰 늘어난다. 폰트의 가로 변형 8단계(라틴 모던 기준 4.01em)를 쓰고,
+그보다 넓으면 가장 큰 변형을 가로로 늘인다 — 아주 넓어지면 끝 곡선이 다소 퍼진다.
+뒤따르는 `^`(overbrace) · `_`(underbrace)는 **중괄호 위/아래 가운데** 라벨이 된다.
+
+### 자리 맞춤
+
+`\phantom{}` (폭·높이 유지, 안 그림) `\hphantom{}` (폭만) `\vphantom{}` (높이만)
+`\smash{}` (그리되 높이 0으로 신고) `\mathstrut` (`\vphantom{(}`)
+
 ### 악센트
 
 `\vec` `\hat` `\bar` `\dot` `\ddot` `\dddot` `\ddddot` `\tilde` `\check` `\breve`
@@ -85,7 +95,7 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 ### 큰 연산자
 
-`\sum` `\prod` `\coprod` `\int` `\iint` `\iiint` `\oint`
+`\sum` `\prod` `\coprod` `\int` `\iint` `\iiint` `\oint` `\idotsint`
 `\bigcup` `\bigcap` `\bigoplus` `\bigotimes` `\bigodot` `\biguplus` `\bigvee` `\bigwedge` `\bigsqcup`
 `\lim` `\limsup` `\liminf` `\varlimsup` `\varliminf` `\varprojlim` `\varinjlim` `\injlim` `\projlim` `\plim`
 `\sup` `\inf` `\max` `\min` `\argmax` `\argmin` `\det` `\dim` `\ker` `\deg` `\gcd` `\Pr` `\arg` `\hom`

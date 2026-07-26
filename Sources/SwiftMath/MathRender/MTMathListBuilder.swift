@@ -833,6 +833,8 @@ public struct MTMathListBuilder {
     static let decorationKinds: [String: MTDecorated.Kind] = [
         "boxed": .boxed, "fbox": .boxed, "framebox": .boxed,
         "cancel": .cancel, "bcancel": .backCancel, "xcancel": .crossCancel,
+        "phantom": .phantom, "hphantom": .horizontalPhantom,
+        "vphantom": .verticalPhantom, "smash": .smash,
     ]
 
     mutating func atomForCommand(_ command:String) -> MTMathAtom? {
@@ -1017,6 +1019,41 @@ public struct MTMathListBuilder {
             let under = MTUnderLine()
             under.innerList = self.buildInternal(true)
             return under
+        } else if command == "overbrace" || command == "underbrace" {
+            // 본체 폭에 맞춰 늘어나는 중괄호. `\overbrace{x}^{설명}` 처럼 뒤에 붙는 첨자는
+            // 중괄호 **위/아래 가운데**로 가야 하므로(LaTeX 는 \mathop 으로 펼친다) 여기서
+            // 직접 집어삼킨다. 그냥 두면 일반 첨자가 되어 오른쪽 위에 붙는다.
+            guard let body = self.buildInternal(true) else { return nil }
+            let underOver = MTUnderOver()
+            underOver.innerList = body
+            let isOver = command == "overbrace"
+            // U+23DE TOP CURLY BRACKET / U+23DF BOTTOM CURLY BRACKET
+            if isOver { underOver.stretchyOver = "\u{23DE}" } else { underOver.stretchyUnder = "\u{23DF}" }
+
+            self.skipSpaces()
+            if self.hasCharacters {
+                let next = self.getNextCharacter()
+                if (isOver && next == "^") || (!isOver && next == "_") {
+                    if isOver { underOver.over = self.buildInternal(true) }
+                    else { underOver.under = self.buildInternal(true) }
+                } else {
+                    self.unlookCharacter()
+                }
+            }
+            return underOver
+        } else if command == "mathstrut" {
+            // \mathstrut 은 정의가 \vphantom{(} 다 — 인자를 받지 않고 여는 괄호 높이의
+            // 보이지 않는 버팀목을 세운다. 줄마다 높이를 맞출 때 쓴다.
+            let strut = MTDecorated()
+            strut.kind = .verticalPhantom
+            let paren = MTMathList()
+            paren.add(MTMathAtomFactory.atom(forCharacter: "(") ?? MTMathAtom(type: .open, value: "("))
+            strut.innerList = paren
+            return strut
+        } else if command == "idotsint" {
+            // ∫⋯∫ — 단일 코드포인트가 없어 세 글자를 한 연산자로 묶는다.
+            // makeLargeOp 이 여러 글자 nucleus 를 CTLine 으로 그리는 경로를 이미 갖고 있다.
+            return MTLargeOperator(value: "\u{222B}\u{22EF}\u{222B}", limits: false)
         } else if let kind = MTMathListBuilder.decorationKinds[command] {
             // \boxed 와 \cancel 계열 — 내용은 그대로 두고 위에 선을 덧그린다.
             let decorated = MTDecorated()

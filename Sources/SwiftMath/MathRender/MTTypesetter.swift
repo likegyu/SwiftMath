@@ -1336,9 +1336,29 @@ class MTTypesetter {
             ?? MTMathListDisplay(withDisplays: [], range: underOver.indexRange)
 
         // 위·아래가 모두 없으면 본체만 돌려준다 — 빈 장식으로 높이를 늘릴 이유가 없다.
-        guard underOver.over != nil || underOver.under != nil else {
+        guard underOver.over != nil || underOver.under != nil
+                || underOver.stretchyOver != nil || underOver.stretchyUnder != nil else {
             nucleus.position = currentPosition
             return nucleus
+        }
+
+        // 늘어나는 글리프(중괄호)를 먼저 본체 위/아래에 붙인다. 라벨이 있으면 그 바깥에
+        // 한 겹 더 쌓으므로, 이 결과가 다음 단계의 "본체"가 된다.
+        var base: MTDisplay = nucleus
+        if let glyph = underOver.stretchyOver ?? underOver.stretchyUnder,
+           let braced = stretchedGlyphDisplay(glyph, toWidth: nucleus.width, range: underOver.indexRange) {
+            let isOver = underOver.stretchyOver != nil
+            let stack = MTLargeOpLimitsDisplay(withNucleus: nucleus,
+                                               upperLimit: isOver ? braced : nil,
+                                               lowerLimit: isOver ? nil : braced,
+                                               limitShift: 0, extraPadding: 0)
+            if let mathTable = styleFont.mathTable {
+                // 중괄호는 첨자보다 본체에 바짝 붙어야 한다 — 사이가 뜨면 무엇을 묶는지
+                // 알아보기 어려워진다. 위/아래 선 간격과 같은 값을 쓴다.
+                if isOver { stack.upperLimitGap = mathTable.overbarVerticalGap }
+                else { stack.lowerLimitGap = mathTable.underbarVerticalGap }
+            }
+            base = stack
         }
 
         let scriptStyle = self.scriptStyle()
@@ -1352,7 +1372,14 @@ class MTTypesetter {
                                                cramped: self.subscriptCramped())
         }
 
-        let display = MTLargeOpLimitsDisplay(withNucleus: nucleus, upperLimit: over,
+        // 라벨이 하나도 없으면(중괄호만 있는 `\overbrace{x}`) 여기서 끝난다.
+        guard over != nil || under != nil else {
+            base.position = currentPosition
+            base.range = underOver.indexRange
+            return base
+        }
+
+        let display = MTLargeOpLimitsDisplay(withNucleus: base, upperLimit: over,
                                              lowerLimit: under, limitShift: 0, extraPadding: 0)
         if let mathTable = styleFont.mathTable {
             if over != nil { display.upperLimitGap = max(mathTable.upperLimitGapMin,
@@ -1363,6 +1390,40 @@ class MTTypesetter {
         display.position = currentPosition
         display.range = underOver.indexRange
         return display
+    }
+
+    /// 주어진 문자를 목표 폭까지 늘린 글리프 표시.
+    ///
+    /// 폰트의 **가로 변형**(h_variants)을 먼저 쓴다. 라틴 모던의 중괄호는 8단계로 4.01em
+    /// 까지 커진다. 그보다 넓은 내용은 가장 큰 변형을 가로로만 늘여 메운다 — 가로 assembly
+    /// (조각을 이어 붙이는 방식)가 폰트 표에 없어서 이게 유일한 수단이다. 중괄호는 가운데가
+    /// 대부분 수평선이라 늘여도 티가 덜 나지만, 아주 넓어지면 끝 곡선이 퍼진다.
+    func stretchedGlyphDisplay(_ character: String, toWidth targetWidth: CGFloat,
+                               range: NSRange) -> MTMathListDisplay? {
+        guard let scalar = character.unicodeScalars.first else { return nil }
+        var glyph = self.findGlyphForCharacterAtIndex(character.startIndex, inString: character)
+        guard glyph != 0 else { return nil }
+        _ = scalar
+
+        var ascent = CGFloat(0), descent = CGFloat(0), width = CGFloat(0), minY = CGFloat(0)
+        glyph = self.findVariantGlyph(glyph, withMaxWidth: targetWidth, maxWidth: &ascent,
+                                      glyphDescent: &descent, glyphWidth: &width, glyphMinY: &minY)
+
+        let glyphDisplay = MTGlyphDisplay(withGlpyh: glyph, range: range, font: styleFont)
+        glyphDisplay.ascent = ascent
+        glyphDisplay.descent = descent
+        glyphDisplay.width = width
+        // 가장 큰 변형으로도 모자라면 가로로만 늘인다.
+        if width > 0, targetWidth > width {
+            glyphDisplay.scaleX = targetWidth / width
+            glyphDisplay.width = targetWidth
+        }
+
+        let wrapper = MTMathListDisplay(withDisplays: [glyphDisplay], range: range)
+        wrapper.width = glyphDisplay.width
+        wrapper.ascent = glyphDisplay.ascent
+        wrapper.descent = glyphDisplay.descent
+        return wrapper
     }
 
     /// `\boxed` 과 `\cancel` 계열을 조판한다.
@@ -1389,6 +1450,28 @@ class MTTypesetter {
             display.ascent = inner.ascent + padding + thickness
             display.descent = inner.descent + padding + thickness
             display.position = currentPosition   // 내용 위치를 여백 반영해 다시 잡는다
+            return display
+
+        case .phantom, .horizontalPhantom, .verticalPhantom, .smash:
+            let display = MTMaskedDisplay(withInner: inner,
+                                          drawsContent: decorated.kind.drawsContent,
+                                          position: currentPosition, range: decorated.indexRange)
+            // 종류마다 어느 치수를 남길지가 다르다. 남기지 않는 축은 0 으로 신고해서
+            // 줄 높이·다음 원자 위치에 영향을 주지 않게 한다.
+            switch decorated.kind {
+            case .verticalPhantom:
+                display.width = 0
+                display.ascent = inner.ascent
+                display.descent = inner.descent
+            case .horizontalPhantom, .smash:
+                display.width = inner.width
+                display.ascent = 0
+                display.descent = 0
+            default:   // .phantom — 세 치수 모두 남긴다
+                display.width = inner.width
+                display.ascent = inner.ascent
+                display.descent = inner.descent
+            }
             return display
 
         case .cancel, .backCancel, .crossCancel:

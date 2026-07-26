@@ -23,6 +23,12 @@ final class UnderOverRenderTests: XCTestCase {
         (#"\boxed{\text{정답}: x = 5}"#, "boxed — CJK"),
         (#"\frac{\cancel{x}\,y}{\cancel{x}} = y"#, "cancel — 약분"),
         (#"\bcancel{a} \quad \xcancel{b} \quad \cancel{속도}"#, "bcancel·xcancel·CJK"),
+        (#"\overbrace{a+b}"#, "overbrace — 짧은 내용"),
+        (#"\overbrace{a+b+c+d+e+f}^{n\text{개}}"#, "overbrace + 라벨 — 긴 내용"),
+        (#"\underbrace{x_1 + x_2 + x_3}_{\text{합}}"#, "underbrace + 라벨"),
+        (#"\overbrace{속도 + 가속도}^{\text{운동학}}"#, "overbrace — CJK"),
+        (#"\idotsint f\,dV"#, "idotsint"),
+        (#"a\phantom{XXX}b \quad a\hphantom{XXX}b"#, "phantom / hphantom"),
     ]
 
     func testRenderUnderOverSheet() throws {

@@ -601,6 +601,11 @@ public class MTUnderOver: MTMathAtom {
     public var over: MTMathList?
     /// 본체 아래에 script 크기로 놓이는 내용.
     public var under: MTMathList?
+    /// 본체 **폭에 맞춰 늘어나는** 글리프를 위에 얹는다 — `\overbrace` 의 중괄호.
+    /// `over` 라벨이 함께 있으면 라벨이 이 글리프 위에 놓인다.
+    public var stretchyOver: String?
+    /// `\underbrace` 용. 아래쪽 늘어나는 글리프.
+    public var stretchyUnder: String?
 
     override public var finalized: MTMathAtom {
         let newUnderOver = super.finalized as! MTUnderOver
@@ -618,6 +623,8 @@ public class MTUnderOver: MTMathAtom {
         // "빈 장식"이 구분되지 않아 높이가 괜히 늘어난다.
         self.over = underOver?.over != nil ? MTMathList(underOver!.over) : nil
         self.under = underOver?.under != nil ? MTMathList(underOver!.under) : nil
+        self.stretchyOver = underOver?.stretchyOver
+        self.stretchyUnder = underOver?.stretchyUnder
     }
 
     override init() {
@@ -628,10 +635,14 @@ public class MTUnderOver: MTMathAtom {
 
 // MARK: - MTDecorated
 
-/// 내용 **위에 덧그리는** 장식 — 테두리(`\boxed`)와 취소선(`\cancel` 계열).
+/// 내용을 감싸 **보이기와 치수를 손보는** 장식.
 ///
-/// 위·아래로 내용을 쌓는 `MTUnderOver` 와 달리 내용 자체는 그대로 두고 그 위에 선을
-/// 얹는다. 그래서 `\cancel` 은 크기가 아예 안 변하고, `\boxed` 만 여백만큼 커진다.
+/// 두 갈래가 한 원자에 들어 있다. 하나는 내용 위에 선을 덧그리는 쪽(`\boxed`, `\cancel`
+/// 계열)이고, 다른 하나는 내용을 감추거나 치수만 남기는 쪽(`\phantom` 계열, `\smash`)이다.
+/// 둘 다 "안쪽 리스트 하나를 감싼다"는 모양이 같아 원자를 나누지 않았다.
+///
+/// 위·아래로 내용을 쌓는 `MTUnderOver` 와는 다른 갈래다 — 저쪽은 내용이 늘어나고
+/// 이쪽은 내용은 그대로다.
 public class MTDecorated: MTMathAtom {
     public enum Kind {
         /// `\boxed` — 테두리 상자.
@@ -642,6 +653,22 @@ public class MTDecorated: MTMathAtom {
         case backCancel
         /// `\xcancel` — X자 취소선.
         case crossCancel
+        /// `\phantom` — 자리는 그대로 차지하되 그리지 않는다.
+        case phantom
+        /// `\hphantom` — 폭만 남기고 높이는 0.
+        case horizontalPhantom
+        /// `\vphantom`·`\mathstrut` — 높이만 남기고 폭은 0.
+        case verticalPhantom
+        /// `\smash` — 그리기는 하되 높이를 0으로 신고해 윗줄·아랫줄을 밀지 않는다.
+        case smash
+
+        /// 내용을 실제로 그리는가. phantom 계열만 안 그린다.
+        var drawsContent: Bool {
+            switch self {
+            case .phantom, .horizontalPhantom, .verticalPhantom: return false
+            default: return true
+            }
+        }
     }
 
     public var innerList: MTMathList?
