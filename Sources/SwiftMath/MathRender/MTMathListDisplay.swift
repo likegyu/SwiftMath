@@ -838,6 +838,123 @@ class MTLineDisplay : MTDisplay {
     
 }
 
+// MARK: - MTBoxDisplay
+
+/// `\boxed` — 내용 둘레에 테두리를 그린다.
+///
+/// `MTLineDisplay` 와 구조가 같지만 선이 아니라 사각형이고, 내용과 테두리 사이에 여백이
+/// 있어서 폭·높이가 그만큼 늘어난다(LaTeX 의 \fboxsep).
+class MTBoxDisplay: MTDisplay {
+    var inner: MTMathListDisplay?
+    /// 내용과 테두리 사이 여백.
+    var padding: CGFloat = 0
+    var lineThickness: CGFloat = 0
+
+    init(withInner inner: MTMathListDisplay?, position: CGPoint, range: NSRange) {
+        super.init()
+        self.inner = inner
+        self.position = position
+        self.range = range
+    }
+
+    override var textColor: MTColor? {
+        set { super.textColor = newValue; inner?.textColor = newValue }
+        get { super.textColor }
+    }
+
+    override var position: CGPoint {
+        set { super.position = newValue; updateInnerPosition() }
+        get { super.position }
+    }
+
+    override func draw(_ context: CGContext) {
+        super.draw(context)
+        self.inner?.draw(context)
+
+        context.saveGState()
+        self.textColor?.setStroke()
+        // 선 굵기의 절반만큼 안으로 들여 그린다 — 그래야 획이 테두리 밖으로 새지 않는다.
+        let half = lineThickness / 2
+        let rect = CGRect(x: position.x + half,
+                          y: position.y - descent + half,
+                          width: width - lineThickness,
+                          height: ascent + descent - lineThickness)
+        let path = MTBezierPath(rect: rect)
+        path.lineWidth = lineThickness
+        path.stroke()
+        context.restoreGState()
+    }
+
+    func updateInnerPosition() {
+        // 내용은 테두리 안쪽으로 여백만큼 들어간다.
+        self.inner?.position = CGPointMake(position.x + padding + lineThickness, position.y)
+    }
+}
+
+// MARK: - MTCancelDisplay
+
+/// `\cancel`·`\bcancel`·`\xcancel` — 내용을 가로지르는 사선.
+///
+/// 크기는 바꾸지 않는다. LaTeX 의 cancel 패키지도 취소선 때문에 자리를 더 먹지는 않는다.
+class MTCancelDisplay: MTDisplay {
+    enum Slant {
+        /// `\cancel` — 왼쪽 아래에서 오른쪽 위로.
+        case forward
+        /// `\bcancel` — 왼쪽 위에서 오른쪽 아래로.
+        case backward
+        /// `\xcancel` — 둘 다.
+        case cross
+    }
+
+    var inner: MTMathListDisplay?
+    var slant: Slant = .forward
+    var lineThickness: CGFloat = 0
+
+    init(withInner inner: MTMathListDisplay?, slant: Slant, position: CGPoint, range: NSRange) {
+        super.init()
+        self.inner = inner
+        self.slant = slant
+        self.position = position
+        self.range = range
+    }
+
+    override var textColor: MTColor? {
+        set { super.textColor = newValue; inner?.textColor = newValue }
+        get { super.textColor }
+    }
+
+    override var position: CGPoint {
+        set { super.position = newValue; updateInnerPosition() }
+        get { super.position }
+    }
+
+    override func draw(_ context: CGContext) {
+        super.draw(context)
+        self.inner?.draw(context)
+
+        context.saveGState()
+        self.textColor?.setStroke()
+        let left = position.x, right = position.x + width
+        let bottom = position.y - descent, top = position.y + ascent
+        let path = MTBezierPath()
+        if slant == .forward || slant == .cross {
+            path.move(to: CGPointMake(left, bottom))
+            path.addLine(to: CGPointMake(right, top))
+        }
+        if slant == .backward || slant == .cross {
+            path.move(to: CGPointMake(left, top))
+            path.addLine(to: CGPointMake(right, bottom))
+        }
+        path.lineWidth = lineThickness
+        path.stroke()
+        context.restoreGState()
+    }
+
+    func updateInnerPosition() {
+        self.inner?.position = CGPointMake(position.x, position.y)
+    }
+}
+
 // MARK: - MTAccentDisplay
 
 /// Rendering an accent as a display

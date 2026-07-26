@@ -87,6 +87,9 @@ func getInterElementSpaceArrayIndexForType(_ type:MTMathAtomType, row:Bool) -> I
         // (\stackrel 처럼 관계연산자로 써야 하는 경우는 원자의 type 자체를 .relation 으로 만든다.)
         case .underOver:
             return 0
+        // 테두리·취소선은 내용 위에 덧그리는 장식이라 간격은 보통 원자와 같다.
+        case .decorated:
+            return 0
         // Special types that don't typically participate in spacing are treated as ordinary
         case .boundary, .space, .style:
             return 0
@@ -1360,6 +1363,50 @@ class MTTypesetter {
         display.position = currentPosition
         display.range = underOver.indexRange
         return display
+    }
+
+    /// `\boxed` 과 `\cancel` 계열을 조판한다.
+    func makeDecorated(_ decorated: MTDecorated?) -> MTDisplay? {
+        guard let decorated,
+              let inner = MTTypesetter.createLineForMathList(
+                decorated.innerList, font: font, style: style, cramped: cramped)
+        else { return nil }
+
+        // 선 굵기는 분수 가로선과 맞춘다 — 한 수식 안에서 획 굵기가 들쭉날쭉하면 눈에 띈다.
+        let thickness = styleFont.mathTable?.fractionRuleThickness ?? (styleFont.fontSize / 20)
+
+        switch decorated.kind {
+        case .boxed:
+            // LaTeX \fboxsep 은 3pt(10pt 기준) = 0.3em 이지만, 수식 안에서는 그만큼 두면
+            // 너무 헐렁하다. 0.2em 이 본문 줄 간격을 해치지 않으면서 테두리가 내용에
+            // 붙지도 않는 지점이다.
+            let padding = styleFont.fontSize * 0.2
+            let display = MTBoxDisplay(withInner: inner, position: currentPosition,
+                                       range: decorated.indexRange)
+            display.padding = padding
+            display.lineThickness = thickness
+            display.width = inner.width + 2 * (padding + thickness)
+            display.ascent = inner.ascent + padding + thickness
+            display.descent = inner.descent + padding + thickness
+            display.position = currentPosition   // 내용 위치를 여백 반영해 다시 잡는다
+            return display
+
+        case .cancel, .backCancel, .crossCancel:
+            let slant: MTCancelDisplay.Slant
+            switch decorated.kind {
+            case .backCancel:  slant = .backward
+            case .crossCancel: slant = .cross
+            default:           slant = .forward
+            }
+            let display = MTCancelDisplay(withInner: inner, slant: slant,
+                                          position: currentPosition, range: decorated.indexRange)
+            display.lineThickness = thickness
+            // 취소선은 자리를 더 먹지 않는다 — 내용 치수를 그대로 쓴다.
+            display.width = inner.width
+            display.ascent = inner.ascent
+            display.descent = inner.descent
+            return display
+        }
     }
 
     func makeUnderline(_ under:MTUnderLine?) -> MTDisplay? {

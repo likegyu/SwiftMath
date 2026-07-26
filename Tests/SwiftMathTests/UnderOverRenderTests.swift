@@ -19,6 +19,10 @@ final class UnderOverRenderTests: XCTestCase {
         (#"\overset{정의}{=} \quad \underset{질량}{m}"#, "CJK 장식"),
         (#"\sum_{\substack{속도>0 \\ 가속도<0}} F"#, "CJK substack"),
         (#"x \overset{?}{=} \frac{\overset{a}{b}}{c}"#, "분수 안 중첩"),
+        (#"\boxed{E = mc^2}"#, "boxed — 테두리"),
+        (#"\boxed{\text{정답}: x = 5}"#, "boxed — CJK"),
+        (#"\frac{\cancel{x}\,y}{\cancel{x}} = y"#, "cancel — 약분"),
+        (#"\bcancel{a} \quad \xcancel{b} \quad \cancel{속도}"#, "bcancel·xcancel·CJK"),
     ]
 
     func testRenderUnderOverSheet() throws {

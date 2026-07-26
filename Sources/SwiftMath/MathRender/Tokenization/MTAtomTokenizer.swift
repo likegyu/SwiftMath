@@ -97,6 +97,9 @@ class MTAtomTokenizer {
         if let underOver = atom as? MTUnderOver {
             return tokenizeUnderOver(underOver, prevAtom: prevAtom, atomIndex: atomIndex)
         }
+        if let decorated = atom as? MTDecorated {
+            return tokenizeDecorated(decorated, prevAtom: prevAtom, atomIndex: atomIndex)
+        }
 
         switch atom.type {
         // Simple text and variables
@@ -1054,6 +1057,30 @@ class MTAtomTokenizer {
             parentId: nil,
             originalAtom: underOver,
             indexRange: underOver.indexRange,
+            color: nil,
+            backgroundColor: nil,
+            indivisible: true
+        )
+    }
+
+    private func tokenizeDecorated(_ decorated: MTDecorated, prevAtom: MTMathAtom?, atomIndex: Int) -> MTBreakableElement? {
+        let typesetter = MTTypesetter(withFont: font, style: style, cramped: cramped, spaced: false)
+        guard let display = typesetter.makeDecorated(decorated) else { return nil }
+
+        return MTBreakableElement(
+            content: .display(display),
+            width: display.width,
+            height: display.ascent + display.descent,
+            ascent: display.ascent,
+            descent: display.descent,
+            isBreakBefore: true,
+            isBreakAfter: true,
+            penaltyBefore: MTBreakPenalty.good,
+            penaltyAfter: MTBreakPenalty.good,
+            groupId: nil,
+            parentId: nil,
+            originalAtom: decorated,
+            indexRange: decorated.indexRange,
             color: nil,
             backgroundColor: nil,
             indivisible: true

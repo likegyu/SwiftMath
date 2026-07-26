@@ -51,6 +51,8 @@ public enum MTMathAtomType: Int, CustomStringConvertible, Comparable {
     /// 본체 위/아래에 무언가를 쌓아 올린 원자 — `\overset`, `\underset`, `\substack`.
     /// TeX 에는 대응하는 원자 종류가 없다(매크로가 `\mathop…\limits` 로 펼쳐진다).
     case underOver
+    /// 내용 위에 테두리나 취소선을 덧그린 원자 — `\boxed`, `\cancel` 계열.
+    case decorated
 
     // Atoms after this point do not support subscripts or superscripts
     
@@ -107,6 +109,7 @@ public enum MTMathAtomType: Int, CustomStringConvertible, Comparable {
             case .overline:       return "Overline"
             case .accent:         return "Accent"
             case .underOver:      return "UnderOver"
+            case .decorated:      return "Decorated"
             case .boundary:       return "Boundary"
             case .space:          return "Space"
             case .style:          return "Style"
@@ -225,6 +228,9 @@ public class MTMathAtom: NSObject {
         // 잃어버려 장식이 통째로 사라진다.
         if let underOver = self as? MTUnderOver {
             return MTUnderOver(underOver)
+        }
+        if let decorated = self as? MTDecorated {
+            return MTDecorated(decorated)
         }
         switch self.type {
             case .largeOperator:
@@ -617,6 +623,46 @@ public class MTUnderOver: MTMathAtom {
     override init() {
         super.init()
         self.type = .underOver
+    }
+}
+
+// MARK: - MTDecorated
+
+/// 내용 **위에 덧그리는** 장식 — 테두리(`\boxed`)와 취소선(`\cancel` 계열).
+///
+/// 위·아래로 내용을 쌓는 `MTUnderOver` 와 달리 내용 자체는 그대로 두고 그 위에 선을
+/// 얹는다. 그래서 `\cancel` 은 크기가 아예 안 변하고, `\boxed` 만 여백만큼 커진다.
+public class MTDecorated: MTMathAtom {
+    public enum Kind {
+        /// `\boxed` — 테두리 상자.
+        case boxed
+        /// `\cancel` — 왼쪽 아래에서 오른쪽 위로 긋는 취소선.
+        case cancel
+        /// `\bcancel` — 반대 방향 취소선.
+        case backCancel
+        /// `\xcancel` — X자 취소선.
+        case crossCancel
+    }
+
+    public var innerList: MTMathList?
+    public var kind: Kind = .boxed
+
+    override public var finalized: MTMathAtom {
+        let newDecorated = super.finalized as! MTDecorated
+        newDecorated.innerList = newDecorated.innerList?.finalized
+        return newDecorated
+    }
+
+    init(_ decorated: MTDecorated?) {
+        super.init(decorated)
+        self.type = .decorated
+        self.kind = decorated?.kind ?? .boxed
+        self.innerList = MTMathList(decorated?.innerList)
+    }
+
+    override init() {
+        super.init()
+        self.type = .decorated
     }
 }
 

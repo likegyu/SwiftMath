@@ -727,6 +727,10 @@ public struct MTMathListBuilder {
                         str += "\\underline"
                         str += "{\(mathListToString(underline.innerList!))}"
                     }
+                } else if let decorated = atom as? MTDecorated {
+                    let name = MTMathListBuilder.decorationKinds
+                        .first { $0.value == decorated.kind && $0.key != "fbox" && $0.key != "framebox" }?.key
+                    str += "\\\(name ?? "boxed"){\(mathListToString(decorated.innerList ?? MTMathList()))}"
                 } else if let underOver = atom as? MTUnderOver {
                     // 타입이 아니라 클래스로 가른다 — \stackrel 은 type 이 .relation 이다.
                     let base = mathListToString(underOver.innerList ?? MTMathList())
@@ -815,6 +819,12 @@ public struct MTMathListBuilder {
         return ""
     }
     
+    /// 내용 위에 선을 덧그리는 명령들. `\fbox` 는 본문용이지만 수식 안에서도 자주 쓰인다.
+    static let decorationKinds: [String: MTDecorated.Kind] = [
+        "boxed": .boxed, "fbox": .boxed, "framebox": .boxed,
+        "cancel": .cancel, "bcancel": .backCancel, "xcancel": .crossCancel,
+    ]
+
     mutating func atomForCommand(_ command:String) -> MTMathAtom? {
         if let atom = MTMathAtomFactory.atom(forLatexSymbol: command) {
             return atom
@@ -995,6 +1005,13 @@ public struct MTMathListBuilder {
             let under = MTUnderLine()
             under.innerList = self.buildInternal(true)
             return under
+        } else if let kind = MTMathListBuilder.decorationKinds[command] {
+            // \boxed 와 \cancel 계열 — 내용은 그대로 두고 위에 선을 덧그린다.
+            let decorated = MTDecorated()
+            decorated.kind = kind
+            guard let inner = self.buildInternal(true) else { return nil }
+            decorated.innerList = inner
+            return decorated
         } else if command == "overset" || command == "underset" || command == "stackrel" {
             // 셋 다 인자 순서가 {장식}{본체} 다.
             //
