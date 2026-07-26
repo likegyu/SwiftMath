@@ -92,6 +92,12 @@ class MTAtomTokenizer {
 
     /// Tokenize a single atom (without scripts)
     private func tokenizeAtom(_ atom: MTMathAtom, prevAtom: MTMathAtom?, atomIndex: Int, allAtoms: [MTMathAtom]) -> MTBreakableElement? {
+        // 타입이 아니라 클래스로 먼저 가른다. \stackrel 은 간격을 위해 type 이 .relation 인데,
+        // 그대로 두면 관계연산자 경로로 흘러가 본체가 문자열로 취급된다.
+        if let underOver = atom as? MTUnderOver {
+            return tokenizeUnderOver(underOver, prevAtom: prevAtom, atomIndex: atomIndex)
+        }
+
         switch atom.type {
         // Simple text and variables
         case .ordinary, .variable, .number:
@@ -1020,6 +1026,38 @@ class MTAtomTokenizer {
             }
         }
         return false
+    }
+
+    private func tokenizeUnderOver(_ underOver: MTUnderOver, prevAtom: MTMathAtom?, atomIndex: Int) -> MTBreakableElement? {
+        let typesetter = MTTypesetter(withFont: font, style: style, cramped: cramped, spaced: false)
+        guard let display = typesetter.makeUnderOver(underOver) else { return nil }
+
+        // 본체는 자기만의 리스트로 조판되는데, 그 리스트는 **앞쪽 여백만** 갖고 끝난다.
+        // 그래서 감싸고 나면 뒤쪽 한 몫(전체의 절반)이 모자라 다음 원소가 달라붙는다.
+        // 측정: `A\rightarrow B` 61.29pt 인데 감싸면 55.74pt — 모자란 5.56pt 가 관계 여백
+        // 11.11pt 의 절반이다. 전체를 다시 더하면 반대로 그만큼 벌어진다.
+        //
+        // 폭만 늘리고 `leadingSpace` 는 건드리지 않는다. 늘어난 몫이 자연히 오른쪽에 남는다.
+        let missingTrailingSpace = widthCalculator.operatorSpacing(for: underOver.type) / 2
+
+        return MTBreakableElement(
+            content: .display(display),
+            width: display.width + missingTrailingSpace,
+            height: display.ascent + display.descent,
+            ascent: display.ascent,
+            descent: display.descent,
+            isBreakBefore: true,
+            isBreakAfter: true,
+            penaltyBefore: MTBreakPenalty.good,
+            penaltyAfter: MTBreakPenalty.good,
+            groupId: nil,
+            parentId: nil,
+            originalAtom: underOver,
+            indexRange: underOver.indexRange,
+            color: nil,
+            backgroundColor: nil,
+            indivisible: true
+        )
     }
 
     private func tokenizeUnderline(_ underline: MTUnderLine, prevAtom: MTMathAtom?, atomIndex: Int) -> MTBreakableElement? {

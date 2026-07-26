@@ -727,6 +727,19 @@ public struct MTMathListBuilder {
                         str += "\\underline"
                         str += "{\(mathListToString(underline.innerList!))}"
                     }
+                } else if let underOver = atom as? MTUnderOver {
+                    // 타입이 아니라 클래스로 가른다 — \stackrel 은 type 이 .relation 이다.
+                    let base = mathListToString(underOver.innerList ?? MTMathList())
+                    if let over = underOver.over, underOver.under == nil {
+                        str += "\\overset{\(mathListToString(over))}{\(base)}"
+                    } else if let under = underOver.under, underOver.over == nil {
+                        str += "\\underset{\(mathListToString(under))}{\(base)}"
+                    } else if let over = underOver.over, let under = underOver.under {
+                        // 둘 다 있으면 한 명령으로는 못 쓴다. 중첩해서 되돌린다.
+                        str += "\\underset{\(mathListToString(under))}{\\overset{\(mathListToString(over))}{\(base)}}"
+                    } else {
+                        str += base
+                    }
                 } else if atom.type == .accent {
                     if let accent = atom as? MTAccent {
                         str += "\\\(MTMathAtomFactory.accentName(accent)!){\(mathListToString(accent.innerList!))}"
@@ -982,6 +995,33 @@ public struct MTMathListBuilder {
             let under = MTUnderLine()
             under.innerList = self.buildInternal(true)
             return under
+        } else if command == "overset" || command == "underset" || command == "stackrel" {
+            // 셋 다 인자 순서가 {장식}{본체} 다.
+            //
+            // TeX 정의가 `\mathop{본체}\limits^{장식}` 이라, 큰 연산자의 위·아래 첨자와
+            // 같은 조판 기계를 쓰는 MTUnderOver 로 만든다. 예전처럼 장식을 버리고 본체만
+            // 남기면 `\overset{\text{def}}{=}` 가 그냥 `=` 가 돼 뜻이 달라진다.
+            guard let decoration = self.buildInternal(true) else { return nil }
+            guard let base = self.buildInternal(true) else { return nil }
+            let underOver = MTUnderOver()
+            underOver.innerList = base
+            if command == "underset" {
+                underOver.under = decoration
+            } else {
+                underOver.over = decoration
+            }
+            // 간격은 **본체의 성격을 물려받는다** — amsmath 의 \binrel@ 이 하는 일이다.
+            // `\overset{?}{=}` 의 `=` 는 여전히 관계연산자라 앞뒤가 벌어져야 하고,
+            // `\overset{a}{x}` 의 `x` 는 보통 원자라 벌어지면 안 된다.
+            if command == "stackrel" {
+                // \stackrel 은 정의부터 \mathrel 이라 본체와 무관하게 관계연산자다.
+                underOver.type = .relation
+            } else if base.atoms.count == 1,
+                      case let baseType = base.atoms[0].type,
+                      baseType == .relation || baseType == .binaryOperator {
+                underOver.type = baseType
+            }
+            return underOver
         } else if command == "substack" {
             // \substack reads ONE braced argument containing rows separated by \\
             // Similar to how \frac reads {numerator}{denominator}
@@ -996,6 +1036,10 @@ public struct MTMathListBuilder {
             // The content may already be a table if \\ was encountered
             // Check if we got a table from the \\ parsing
             if content!.atoms.count == 1, let tableAtom = content!.atoms.first as? MTMathTable {
+                // \substack 의 각 줄은 **가운데 정렬**이다(LaTeX amsmath 정의). \\ 로 만들어진
+                // 표는 기본이 왼쪽 정렬이라 그대로 두면 \sum_{\substack{i<n \\ j<m}} 의
+                // 두 줄이 왼쪽에 붙어 어긋난다.
+                for col in 0..<tableAtom.numColumns { tableAtom.set(alignment: .center, forColumn: col) }
                 return tableAtom
             }
 
@@ -1451,7 +1495,7 @@ public struct MTMathListBuilder {
         } else if command == "underline" {
             let under = MTUnderLine()
             under.innerList = self.buildInternal(true)
-            
+
             return under
         } else if command == "begin" {
             if let env = self.readEnvironment() {

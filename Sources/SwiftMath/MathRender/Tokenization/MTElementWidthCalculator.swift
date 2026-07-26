@@ -48,6 +48,9 @@ class MTElementWidthCalculator {
         return baseWidth + spacing
     }
 
+    /// 미리 조판된 display 원소(예: `\stackrel`)의 여백을 맞추기 위한 통로.
+    func operatorSpacing(for type: MTMathAtomType) -> CGFloat { getOperatorSpacing(type) }
+
     /// Get spacing for an operator (both sides)
     private func getOperatorSpacing(_ type: MTMathAtomType) -> CGFloat {
         guard let mathTable = font.mathTable else { return 0 }

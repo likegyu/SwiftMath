@@ -83,6 +83,10 @@ func getInterElementSpaceArrayIndexForType(_ type:MTMathAtomType, row:Bool) -> I
         // Decorative types (accent, underline, overline) are treated as ordinary
         case .accent, .underline, .overline:
             return 0
+        // \overset·\underset 은 본체의 성격을 물려받지만, 물려받을 게 없으면 보통 원자로 둔다.
+        // (\stackrel 처럼 관계연산자로 써야 하는 경우는 원자의 type 자체를 .relation 으로 만든다.)
+        case .underOver:
+            return 0
         // Special types that don't typically participate in spacing are treated as ordinary
         case .boundary, .space, .style:
             return 0
@@ -1316,6 +1320,48 @@ class MTTypesetter {
     
     // MARK: - Underline/Overline
     
+    /// `\overset`·`\underset`·`\stackrel` 을 조판한다.
+    ///
+    /// TeX 의 정의가 `\mathop{본체}\limits^{위}` 이므로 큰 연산자의 위·아래 첨자와 같은
+    /// 조판 기계(`MTLargeOpLimitsDisplay`)를 그대로 쓴다. 위·아래는 script 크기로 줄이고,
+    /// 가로 중앙에 맞춘다.
+    func makeUnderOver(_ underOver: MTUnderOver?) -> MTDisplay? {
+        guard let underOver else { return nil }
+
+        let nucleus = MTTypesetter.createLineForMathList(
+            underOver.innerList, font: font, style: style, cramped: cramped)
+            ?? MTMathListDisplay(withDisplays: [], range: underOver.indexRange)
+
+        // 위·아래가 모두 없으면 본체만 돌려준다 — 빈 장식으로 높이를 늘릴 이유가 없다.
+        guard underOver.over != nil || underOver.under != nil else {
+            nucleus.position = currentPosition
+            return nucleus
+        }
+
+        let scriptStyle = self.scriptStyle()
+        let scriptFont = font.copy(withSize: MTTypesetter.getStyleSize(scriptStyle, font: font))
+        let over = underOver.over.flatMap {
+            MTTypesetter.createLineForMathList($0, font: scriptFont, style: scriptStyle,
+                                               cramped: self.superScriptCramped())
+        }
+        let under = underOver.under.flatMap {
+            MTTypesetter.createLineForMathList($0, font: scriptFont, style: scriptStyle,
+                                               cramped: self.subscriptCramped())
+        }
+
+        let display = MTLargeOpLimitsDisplay(withNucleus: nucleus, upperLimit: over,
+                                             lowerLimit: under, limitShift: 0, extraPadding: 0)
+        if let mathTable = styleFont.mathTable {
+            if over != nil { display.upperLimitGap = max(mathTable.upperLimitGapMin,
+                                                         mathTable.upperLimitBaselineRiseMin - over!.descent) }
+            if under != nil { display.lowerLimitGap = max(mathTable.lowerLimitGapMin,
+                                                          mathTable.lowerLimitBaselineDropMin - under!.ascent) }
+        }
+        display.position = currentPosition
+        display.range = underOver.indexRange
+        return display
+    }
+
     func makeUnderline(_ under:MTUnderLine?) -> MTDisplay? {
         let innerListDisplay = MTTypesetter.createLineForMathList(under!.innerList, font:font, style:style, cramped:cramped)
         let underDisplay = MTLineDisplay(withInner: innerListDisplay, position: currentPosition, range: under!.indexRange)

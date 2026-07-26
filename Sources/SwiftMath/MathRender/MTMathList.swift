@@ -48,7 +48,10 @@ public enum MTMathAtomType: Int, CustomStringConvertible, Comparable {
     case overline
     /// An accented atom - Accent in TeX
     case accent
-    
+    /// 본체 위/아래에 무언가를 쌓아 올린 원자 — `\overset`, `\underset`, `\substack`.
+    /// TeX 에는 대응하는 원자 종류가 없다(매크로가 `\mathop…\limits` 로 펼쳐진다).
+    case underOver
+
     // Atoms after this point do not support subscripts or superscripts
     
     /// A left atom - Left & Right in TeX. We don't need two since we track boundaries separately.
@@ -103,6 +106,7 @@ public enum MTMathAtomType: Int, CustomStringConvertible, Comparable {
             case .underline:      return "Underline"
             case .overline:       return "Overline"
             case .accent:         return "Accent"
+            case .underOver:      return "UnderOver"
             case .boundary:       return "Boundary"
             case .space:          return "Space"
             case .style:          return "Style"
@@ -216,6 +220,12 @@ public class MTMathAtom: NSObject {
     
     /// Returns a copy of `self`.
     public func copy() -> MTMathAtom {
+        // 타입이 아니라 클래스로 먼저 가른다. MTUnderOver 는 간격을 맞추려고 type 을
+        // .relation 으로 바꿔 쓰기도 하는데(\stackrel), 타입만 보면 그 경우 하위 클래스를
+        // 잃어버려 장식이 통째로 사라진다.
+        if let underOver = self as? MTUnderOver {
+            return MTUnderOver(underOver)
+        }
         switch self.type {
             case .largeOperator:
                 return MTLargeOperator(self as? MTLargeOperator)
@@ -563,6 +573,50 @@ public class MTUnderLine: MTMathAtom {
     override init() {
         super.init()
         self.type = .underline
+    }
+}
+
+// MARK: - MTUnderOver
+
+/// 본체 위·아래에 내용을 쌓는 원자 — `\overset{위}{본체}`, `\underset{아래}{본체}`,
+/// `\stackrel{위}{본체}`.
+///
+/// 지금까지 이런 매크로는 장식을 버리고 본체만 남기는 식으로 강등돼 있었다. TeX 의 정의
+/// (`\mathop{본체}\limits^{위}`)를 그대로 따르면 큰 연산자의 위·아래 첨자와 똑같은 조판
+/// 기계를 재사용할 수 있어서, `MTLargeOpLimitsDisplay` 로 실제 장식을 그린다.
+///
+/// 간격 유형(`type`)은 본체의 성격을 물려받는다. `\stackrel` 은 관계연산자로 쓰이므로
+/// `.relation`, 나머지는 `.underOver`(보통 원자와 같은 간격)다. 이렇게 두면 `.ordinary`
+/// 원자끼리 문자열을 합치는 최적화(`fuse`)에 휘말리지 않는다 — 합쳐지면 내용이 깨진다.
+public class MTUnderOver: MTMathAtom {
+    /// 가운데 놓이는 본체.
+    public var innerList: MTMathList?
+    /// 본체 위에 script 크기로 놓이는 내용.
+    public var over: MTMathList?
+    /// 본체 아래에 script 크기로 놓이는 내용.
+    public var under: MTMathList?
+
+    override public var finalized: MTMathAtom {
+        let newUnderOver = super.finalized as! MTUnderOver
+        newUnderOver.innerList = newUnderOver.innerList?.finalized
+        newUnderOver.over = newUnderOver.over?.finalized
+        newUnderOver.under = newUnderOver.under?.finalized
+        return newUnderOver
+    }
+
+    init(_ underOver: MTUnderOver?) {
+        super.init(underOver)
+        self.type = underOver?.type ?? .underOver
+        self.innerList = MTMathList(underOver?.innerList)
+        // 위·아래는 없을 수 있다. nil 을 빈 리스트로 만들어 버리면 "장식 없음"과
+        // "빈 장식"이 구분되지 않아 높이가 괜히 늘어난다.
+        self.over = underOver?.over != nil ? MTMathList(underOver!.over) : nil
+        self.under = underOver?.under != nil ? MTMathList(underOver!.under) : nil
+    }
+
+    override init() {
+        super.init()
+        self.type = .underOver
     }
 }
 
