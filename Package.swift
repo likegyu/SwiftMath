@@ -12,6 +12,11 @@ let package = Package(
         .library(
             name: "SwiftMath",
             targets: ["SwiftMath"]),
+        // CJK 명조 폰트 번들(5.4MB). Apple 플랫폼에 한글·중문 세리프가 없어서 직접 싣는다.
+        // 수식에 CJK 가 섞이지 않는 사용자는 링크하지 않으면 되고, 그러면 크기도 안 는다.
+        .library(
+            name: "SwiftMathCJKFonts",
+            targets: ["SwiftMathCJKFonts"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -26,8 +31,14 @@ let package = Package(
             resources: [
                 .copy("mathFonts.bundle")
             ]),
+        .target(
+            name: "SwiftMathCJKFonts",
+            dependencies: ["SwiftMath"],
+            resources: [
+                .copy("cjkFonts.bundle")
+            ]),
         .testTarget(
             name: "SwiftMathTests",
-            dependencies: ["SwiftMath"]),
+            dependencies: ["SwiftMath", "SwiftMathCJKFonts"]),
     ]
 )

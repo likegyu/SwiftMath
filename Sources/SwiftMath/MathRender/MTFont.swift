@@ -23,6 +23,10 @@ public class MTFont {
     /// (e.g., Chinese, Japanese, Korean, emoji, etc.)
     public var fallbackFont: CTFont?
 
+    /// 폴백 폰트 전체 목록(우선순위 순). `copy(withFallbackFonts:)` 가 채운다.
+    /// `fallbackFont` 는 이 목록의 첫 항목으로, 글리프 단위 경로가 쓰는 단일 훅이다.
+    public internal(set) var fallbackFonts: [CTFont] = []
+
     init() {}
     
     /// `MTFont(fontWithName:)` does not load the complete math font, it only has about half the glyphs of the full math font.
@@ -67,6 +71,51 @@ public class MTFont {
         return newFont
     }
     
+    /// 폴백 폰트를 지정한 사본을 만든다.
+    ///
+    /// - Parameter fallbacks: 우선순위 순서. 앞쪽 폰트부터 글리프를 찾는다.
+    /// - Returns: 원본은 그대로 두고, 폴백만 얹은 새 `MTFont`.
+    ///
+    /// 시스템 기본 폴백 체인은 **뒤에 그대로 붙인다.** `kCTFontCascadeListAttribute` 를
+    /// 지정하면 기본 체인이 통째로 대체되기 때문에, 그냥 두면 지정한 폰트가 못 그리는
+    /// 문자(예: 한글 전용 서브셋에 없는 한자)가 두부(.notdef)로 나온다. 기본 체인을
+    /// 뒤에 이어 붙여 두면 그런 문자는 최소한 시스템 폰트로는 나온다.
+    ///
+    /// 확장이 아니라 클래스 본문에 있는 이유: `MTFontV2` 가 재정의해야 한다. 확장 메서드는
+    /// 정적 디스패치라 재정의할 수 없다.
+    public func copy(withFallbackFonts fallbacks: [CTFont]) -> MTFont {
+        let size = self.fontSize
+        let newFont = MTFont()
+        newFont.defaultCGFont = self.defaultCGFont
+        newFont.ctFont = MTFont.cascaded(self.ctFont, size: size, fallbacks: fallbacks)
+        // 글리프 단위 경로(근호·큰 연산자·구분자·악센트)는 CTLine 을 타지 않아 캐스케이드가
+        // 닿지 않는다. 그쪽이 쓰는 단일 폴백 훅도 같이 채워 둔다.
+        newFont.fallbackFont = fallbacks.first
+        newFont.fallbackFonts = fallbacks
+        newFont.rawMathTable = self.rawMathTable
+        // 수학 테이블은 ctFont 를 **확정한 뒤에** 만든다 — 생성 시점에 unitsPerEm 과
+        // 폰트 크기를 즉시 읽어 가기 때문이다.
+        newFont.mathTable = MTFontMathTable(withFont: newFont, mathTable: newFont.rawMathTable!)
+        return newFont
+    }
+
+    /// 주어진 폰트에 폴백 캐스케이드를 얹은 CTFont. 폴백이 비면 크기만 맞춘 사본.
+    static func cascaded(_ base: CTFont, size: CGFloat, fallbacks: [CTFont]) -> CTFont {
+        guard !fallbacks.isEmpty else {
+            return CTFontCreateCopyWithAttributes(base, size, nil, nil)
+        }
+        var cascade = fallbacks.map { CTFontCopyFontDescriptor($0) }
+        if let defaults = CTFontCopyDefaultCascadeListForLanguages(base, nil) as? [CTFontDescriptor] {
+            cascade.append(contentsOf: defaults)
+        }
+        // 디스크립터를 **속성으로만** 넘긴다. `CTFontCreateWithFontDescriptor` 로 새로 만들면
+        // CoreText 가 기반 폰트를 이름으로 다시 찾는데, 수학 폰트는 시스템에 등록돼 있지 않아
+        // 엉뚱한 폰트(Helvetica)로 해석될 수 있다. 이 함수는 원본 데이터를 그대로 들고 간다.
+        let attrs = CTFontDescriptorCreateWithAttributes(
+            [kCTFontCascadeListAttribute: cascade] as CFDictionary)
+        return CTFontCreateCopyWithAttributes(base, size, nil, attrs)
+    }
+
     func get(nameForGlyph glyph:CGGlyph) -> String {
         let name = defaultCGFont.name(for: glyph) as? String
         return name ?? ""

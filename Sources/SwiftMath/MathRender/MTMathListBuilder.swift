@@ -60,6 +60,8 @@ enum MTParseErrors:Int {
     case internalError
     /// Limit control applied incorrectly
     case invalidLimits
+    /// The expression nests deeper than the parser will follow.
+    case nestingTooDeep
 }
 
 let MTParseError = "ParseError"
@@ -92,6 +94,21 @@ public struct MTMathListBuilder {
     var currentEnv: MTEnvProperties?
     var currentFontStyle:MTFontStyle
     var spacesAllowed:Bool
+
+    /// 현재 재귀 깊이. buildInternal 이 중첩 그룹마다 자기를 다시 부르므로 이 값이 곧
+    /// 스택 사용량에 비례한다.
+    var nestingDepth = 0
+
+    /// 파서가 따라 들어갈 최대 중첩 깊이.
+    ///
+    /// 스택 오버플로는 Swift 의 오류 처리로 **잡을 수 없다** — 프로세스가 즉사한다.
+    /// 실측(iOS 스택 크기 재현): 메인 스레드 1MB 에서 약 700중첩, 백그라운드 512KB 에서
+    /// 약 400중첩에 죽었다. 신뢰할 수 없는 입력(LLM 생성 LaTeX)을 렌더하는 이상, 크래시를
+    /// 평범한 파싱 오류로 강등시켜야 호출부의 원문 폴백이 받아낼 수 있다.
+    ///
+    /// 100 인 이유: 사람이 쓰는 수식은 깊어야 20~30단이고(3단 중첩 분수가 15단 안팎),
+    /// 실측 한계의 1/4 이라 어떤 스레드에서도 안전하다. 필요하면 소비자가 올릴 수 있다.
+    public static var maxNestingDepth = 100
     var mathMode: MathMode = .display
 
     /** Contains any error that occurred during parsing. */
@@ -388,6 +405,16 @@ public struct MTMathListBuilder {
     }
     
     public mutating func buildInternal(_ oneCharOnly: Bool, stopChar stop: Character?) -> MTMathList? {
+        // 중첩이 스택을 먹어치우기 전에 멈춘다. 여기서 막지 못하면 스택 오버플로가 나는데,
+        // 그건 잡을 수 있는 오류가 아니라 프로세스 즉사라서 호출부가 손쓸 방법이 없다.
+        nestingDepth += 1
+        defer { nestingDepth -= 1 }
+        if nestingDepth > Self.maxNestingDepth {
+            self.setError(.nestingTooDeep,
+                          message: "Nesting too deep (limit \(Self.maxNestingDepth))")
+            return nil
+        }
+
         let list = MTMathList()
         assert(!(oneCharOnly && stop != nil), "Cannot set both oneCharOnly and stopChar.")
         var prevAtom: MTMathAtom? = nil

@@ -22,7 +22,14 @@ public struct MathImage {
     public var textAlignment: MTTextAlignment
 
     public var contentInsets: MTEdgeInsets = MTEdgeInsetsZero
-    
+
+    /// 수학 폰트에 없는 문자(주로 CJK)를 대신 그릴 폰트. 우선순위 순.
+    ///
+    /// 비워 두면 CoreText 의 시스템 기본 폴백이 고른다 — Apple 플랫폼에서 한글은
+    /// AppleSDGothicNeo(고딕)뿐이라, 세리프인 수학 폰트와 한 수식 안에서 서체가 갈린다.
+    /// `SwiftMathCJKFonts` 의 `MTCJKSerif` 로 명조를 지정하면 그 불일치가 사라진다.
+    public var fallbackFonts: [CTFont] = []
+
     public let latex: String
     
     private(set) var intrinsicContentSize = CGSize.zero
@@ -74,7 +81,7 @@ extension MathImage {
             displayList.position = CGPoint(x: textX, y: textY)
         }
         var error: NSError?
-        let mtfont: MTFont? = font.mtfont(size: fontSize)
+        let mtfont: MTFont? = MTFontV2(font: font, size: fontSize, fallbacks: fallbackFonts)
 
         guard let mathList = MTMathListBuilder.build(fromString: latex, error: &error), error == nil,
               let displayList = MTTypesetter.createLineForMathList(mathList, font: mtfont, style: currentStyle) else {
