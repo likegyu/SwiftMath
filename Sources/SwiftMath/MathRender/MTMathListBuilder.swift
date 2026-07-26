@@ -842,6 +842,11 @@ public struct MTMathListBuilder {
         return ""
     }
     
+    /// 별표형이 "번호를 안 붙인다"는 뜻뿐인 환경들. 별을 떼고 같은 조판을 쓴다.
+    static let numberlessEnvironments: Set<String> = [
+        "align", "alignat", "flalign", "equation", "multline", "gather", "gathered", "eqnarray",
+    ]
+
     /// 라벨 폭에 맞춰 늘어나는 화살표들. 화학 반응식(`A \xrightarrow{촉매} B`)에 자주 나온다.
     static let stretchyArrowCommands: [String: MTStretchyArrowDirection] = [
         "xrightarrow": .right, "xleftarrow": .left,
@@ -1176,10 +1181,18 @@ public struct MTMathListBuilder {
 
             return table
         } else if command == "begin" {
-            let env = self.readEnvironment()
-            if env == nil {
-                return nil;
+            guard var env = self.readEnvironment() else { return nil }
+
+            // 디스플레이 환경의 별표형(align*·equation* 등)은 **번호를 안 붙인다**는 뜻일
+            // 뿐이라 조판이 같다. 앱에는 번호를 붙일 자리가 없으니 별을 떼고 같이 다룬다.
+            // (matrix* 계열의 별표는 뜻이 달라 — 열 정렬 인자를 받는다 — 건드리지 않는다.)
+            if env.hasSuffix("*"), MTMathListBuilder.numberlessEnvironments.contains(String(env.dropLast())) {
+                env = String(env.dropLast())
             }
+            // alignat 은 열 쌍 개수를 인자로 받는다: \begin{alignat}{2}. 읽고 버린다 —
+            // 우리 표는 열 수를 내용에서 알아낸다.
+            if env == "alignat", readRawGroup() == nil { self.error = nil }
+
             // array·subarray 는 열 지정이 **필수 인자**다: \begin{array}{cc}
             var columnAlignments: [MTColumnAlignment]? = nil
             if env == "array" || env == "subarray" {
@@ -1188,7 +1201,7 @@ public struct MTMathListBuilder {
             }
             // 별표형 행렬(matrix* 등)은 대괄호로 정렬을 한 번에 받는다.
             var alignment: MTColumnAlignment? = nil
-            if env!.hasSuffix("*") {
+            if env.hasSuffix("*") {
                 alignment = self.readOptionalAlignment()
                 if self.error != nil { return nil }
             }
@@ -1426,7 +1439,14 @@ public struct MTMathListBuilder {
             if env == nil {
                 return nil
             }
-            if env! != currentEnv!.envName {
+            // \begin 쪽에서 별표를 떼고 시작한 환경은 \end 쪽도 같이 떼고 비교한다.
+            // 안 그러면 `\begin{align*}…\end{align*}` 이 이름 불일치로 죽는다.
+            var endName = env!
+            if endName.hasSuffix("*"),
+               MTMathListBuilder.numberlessEnvironments.contains(String(endName.dropLast())) {
+                endName = String(endName.dropLast())
+            }
+            if endName != currentEnv!.envName {
                 let errorMessage = "Begin environment name \(currentEnv!.envName ?? "(none)") does not match end name: \(env!)"
                 self.setError(.invalidEnv, message:errorMessage)
                 return nil
@@ -1695,6 +1715,93 @@ public struct MTMathListBuilder {
         case "ce":
             guard let source = readRawGroup() else { return nil }
             return parseTranspiled(MTChemFormula.toLatex(source), fallback: source)
+
+        // physics 패키지 — 물리·전자공학 강의에 상시로 나온다. 전부 매크로 전개라
+        // 옮긴 결과가 곧 일반 LaTeX 다.
+        case "dv", "pdv", "odv":
+            // \dv{f}{x} · \dv[2]{f}{x}. 차수는 대괄호 선택 인자.
+            let d = (command == "pdv") ? "\\partial" : "d"
+            var order = ""
+            self.skipSpaces()
+            if hasCharacters, string[currentCharIndex] == "[" {
+                _ = getNextCharacter()
+                var text = ""
+                while hasCharacters {
+                    let ch = getNextCharacter()
+                    if ch == "]" { break }
+                    text.append(ch)
+                }
+                order = text
+            }
+            guard let f = readRawGroup() else { return nil }
+            let x = readRawGroup()
+            let power = order.isEmpty ? "" : "^{\(order)}"
+            let numerator = x == nil ? "\(d)\(power)" : "\(d)\(power) \(f)"
+            let denominator = x == nil ? "\(d) \(f)\(power)" : "\(d) \(x!)\(power)"
+            return parseTranspiled("\\frac{\(numerator)}{\(denominator)}", fallback: f)
+
+        case "abs":
+            guard let body = readRawGroup() else { return nil }
+            return parseTranspiled("\\left|\(body)\\right|", fallback: body)
+
+        case "norm":
+            guard let body = readRawGroup() else { return nil }
+            return parseTranspiled("\\left\\|\(body)\\right\\|", fallback: body)
+
+        case "ceil":
+            guard let body = readRawGroup() else { return nil }
+            return parseTranspiled("\\left\\lceil \(body)\\right\\rceil", fallback: body)
+
+        case "floor":
+            guard let body = readRawGroup() else { return nil }
+            return parseTranspiled("\\left\\lfloor \(body)\\right\\rfloor", fallback: body)
+
+        case "set":
+            guard let body = readRawGroup() else { return nil }
+            return parseTranspiled("\\left\\{\(body)\\right\\}", fallback: body)
+
+        case "braket", "ip":
+            guard let a = readRawGroup() else { return nil }
+            guard let b = readRawGroup() else {
+                return parseTranspiled("\\left\\langle \(a)\\right\\rangle", fallback: a)
+            }
+            return parseTranspiled("\\left\\langle \(a)\\middle|\(b)\\right\\rangle",
+                                   fallback: "\(a)|\(b)")
+
+        case "ev", "expval":
+            guard let body = readRawGroup() else { return nil }
+            return parseTranspiled("\\left\\langle \(body)\\right\\rangle", fallback: body)
+
+        case "comm":
+            guard let a = readRawGroup(), let b = readRawGroup() else { return nil }
+            return parseTranspiled("\\left[\(a),\(b)\\right]", fallback: "[\(a),\(b)]")
+
+        case "acomm", "poissonbracket":
+            guard let a = readRawGroup(), let b = readRawGroup() else { return nil }
+            return parseTranspiled("\\left\\{\(a),\(b)\\right\\}", fallback: "{\(a),\(b)}")
+
+        case "middle":
+            // `\left\{ x \middle| P \right\}` — 집합 표기에 늘 나온다. 안쪽 구분자를
+            // 내용 높이에 맞춰 늘리려면 MTInner 를 쪼개야 하는데, 거기까지 가지 않고
+            // **보통 크기 구분자**로 둔다. 늘어나지 않을 뿐 기호와 자리는 맞는다.
+            self.skipSpaces()
+            let name = hasCharacters ? readDelimiter() : nil
+            let glyph = name.flatMap { MTMathAtomFactory.delimiters[$0] } ?? "|"
+            return MTMathList(atom: MTMathAtom(type: .ordinary, value: glyph))
+
+        case "notag", "nonumber":
+            // 번호를 붙이지 않는다는 지시. 앱에는 번호가 없으니 아무 일도 하지 않는다.
+            // 다만 **오류를 내면 안 된다** — 수식 하나가 통째로 날아간다.
+            return MTMathList()
+
+        case "grad":
+            return parseTranspiled("\\nabla ", fallback: "grad")
+        case "divergence":
+            return parseTranspiled("\\nabla \\cdot ", fallback: "div")
+        case "curl":
+            return parseTranspiled("\\nabla \\times ", fallback: "curl")
+        case "laplacian":
+            return parseTranspiled("\\nabla^{2}", fallback: "laplacian")
 
         case "SI", "qty":
             guard let value = readRawGroup(), let unit = readRawGroup() else { return nil }

@@ -18,7 +18,9 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 | 매크로 | 이유 | 대신 |
 |---|---|---|
-| `\begin{alignat}` | 열 수 인자를 받는 정렬 환경 | `aligned` 로 |
+| `\tag{}` `\intertext{}` | 번호·본문 삽입 — 앱에 번호를 붙일 자리가 없다 | 없어도 된다 |
+| `\mathclap{}` `\prescript{}` `\genfrac{}` | mathtools 세부 조판 | 드물다 |
+| `\chemfig{}` (2차원 구조식) | 결합각·고리를 그리는 별도 그리기 언어 | `\ce{}` 로 선형 표기 |
 
 **모르는 명령을 만나면** 파서가 `Invalid command \foo` 오류를 낸다. 소비자 앱은 보통
 그 명령만 지우고 다시 시도하거나(자가치유), 그래도 안 되면 원문을 그대로 보여준다.
@@ -94,7 +96,9 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 ### 환경
 
-`aligned` `cases` `gather` `gathered` `displaylines` `eqnarray` `split` `eqalign`
+`align` `aligned` `alignat` `flalign` `equation` `multline` `gather` `gathered`
+`cases` `dcases` `rcases` `displaylines` `eqnarray` `split` `eqalign`
+(별표형 `align*` 등은 번호를 안 붙인다는 뜻뿐이라 같게 조판한다)
 `matrix` `pmatrix` `bmatrix` `Bmatrix` `vmatrix` `Vmatrix` `smallmatrix`
 (별표형 `matrix*` 등은 대괄호로 열 정렬을 받는다)
 
@@ -130,6 +134,24 @@ LaTeX를 생성하는 쪽(사람이든 LLM이든)이 참고할 목적으로 쓴�
 
 `\,` `\:` `\;` `\!` `\quad` `\qquad` `\ ` `~`
 `\thinspace` `\medspace` `\thickspace` `\enspace` `\negthinspace`
+
+### physics 패키지
+
+`\dv{f}{x}` `\dv[2]{f}{x}` `\pdv{f}{x}` — 미분·편미분
+`\abs{}` `\norm{}` `\ceil{}` `\floor{}` `\set{}` — 자동 크기 구분자
+`\bra{}` `\ket{}` `\braket{}{}` `\ev{}` `\comm{}{}` `\acomm{}{}` — 양자역학 표기
+`\grad` `\divergence` `\curl` `\laplacian` — 벡터 미분
+`\middle` 는 받되 **늘어나지는 않는다**(보통 크기 구분자로 둔다).
+
+### 관례 연산자
+
+표준 LaTeX 에는 없지만 `\DeclareMathOperator` 로 흔히 정의해 쓰는 이름들.
+LLM 이 관례대로 그냥 쓰는 일이 잦아 넣었다:
+
+`\tr` `\rank` `\diag` `\sgn` `\Var` `\Cov` `\Corr` `\Res` `\Span` `\im` `\id`
+`\Aut` `\End` `\Ext` `\Tor` `\Ker` `\coker` `\Hom` `\adj` `\erf` `\erfc` `\sinc`
+
+`\notag`·`\nonumber` 는 **조용히 무시한다** — 오류를 내면 수식 하나가 통째로 날아간다.
 
 ### 화학식 (mhchem 서브셋)
 

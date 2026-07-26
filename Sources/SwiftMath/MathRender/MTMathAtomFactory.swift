@@ -746,6 +746,34 @@ public class MTMathAtomFactory {
         "varliminf" : MTMathAtomFactory.operatorWithName("lim inf", limits: true),
         "varlimsup" : MTMathAtomFactory.operatorWithName("lim sup", limits: true),
         "plim" : MTMathAtomFactory.operatorWithName("plim", limits: true),
+        // 표준 LaTeX 에는 없지만 \DeclareMathOperator 로 흔히 정의해 쓰는 이름들.
+        // LLM 이 관례대로 그냥 \tr·\rank 라고 쓰는 일이 잦아 미지원 명령이 됐다.
+        "tr" : MTMathAtomFactory.operatorWithName("tr", limits: false),
+        "trace" : MTMathAtomFactory.operatorWithName("tr", limits: false),
+        "rank" : MTMathAtomFactory.operatorWithName("rank", limits: false),
+        "diag" : MTMathAtomFactory.operatorWithName("diag", limits: false),
+        "sgn" : MTMathAtomFactory.operatorWithName("sgn", limits: false),
+        "sign" : MTMathAtomFactory.operatorWithName("sgn", limits: false),
+        "Var" : MTMathAtomFactory.operatorWithName("Var", limits: false),
+        "Cov" : MTMathAtomFactory.operatorWithName("Cov", limits: false),
+        "Corr" : MTMathAtomFactory.operatorWithName("Corr", limits: false),
+        "Res" : MTMathAtomFactory.operatorWithName("Res", limits: false),
+        "Span" : MTMathAtomFactory.operatorWithName("span", limits: false),
+        "im" : MTMathAtomFactory.operatorWithName("im", limits: false),
+        "id" : MTMathAtomFactory.operatorWithName("id", limits: false),
+        "Aut" : MTMathAtomFactory.operatorWithName("Aut", limits: false),
+        "Hom" : MTMathAtomFactory.operatorWithName("Hom", limits: false),
+        "End" : MTMathAtomFactory.operatorWithName("End", limits: false),
+        "Ext" : MTMathAtomFactory.operatorWithName("Ext", limits: false),
+        "Tor" : MTMathAtomFactory.operatorWithName("Tor", limits: false),
+        "Ker" : MTMathAtomFactory.operatorWithName("Ker", limits: false),
+        "coker" : MTMathAtomFactory.operatorWithName("coker", limits: false),
+        "adj" : MTMathAtomFactory.operatorWithName("adj", limits: false),
+        "curl" : MTMathAtomFactory.operatorWithName("curl", limits: false),
+        "grad" : MTMathAtomFactory.operatorWithName("grad", limits: false),
+        "erf" : MTMathAtomFactory.operatorWithName("erf", limits: false),
+        "erfc" : MTMathAtomFactory.operatorWithName("erfc", limits: false),
+        "sinc" : MTMathAtomFactory.operatorWithName("sinc", limits: false),
         // 역극한·순극한 — 대수학·위상수학에서 정기적으로 나온다. amsmath 는 lim 아래에
         // 화살표를 붙이지만, 늘어나는 화살표를 아직 못 그리므로 이름으로 구분한다.
         "varprojlim" : MTMathAtomFactory.operatorWithName("proj lim", limits: true),
@@ -1263,7 +1291,21 @@ public class MTMathAtomFactory {
                 } else {
                     return table
                 }
-            } else if env == "eqalign" || env == "split" || env == "aligned" {
+            } else if env == "equation" {
+                // 번호 붙는 단일 수식. 앱에는 번호를 붙일 자리가 없으니 가운데 정렬 한 줄로 둔다.
+                table.interRowAdditionalSpacing = 0
+                table.interColumnSpacing = 0
+                if table.numColumns > 0 { table.set(alignment: .center, forColumn: 0) }
+                return table
+            } else if env == "multline" {
+                // 한 수식을 여러 줄로 쪼개는 환경. LaTeX 는 첫 줄 왼쪽·끝 줄 오른쪽이지만
+                // 번호도 여백도 없는 여기서는 가운데로 모으는 편이 자연스럽다.
+                table.interRowAdditionalSpacing = 1
+                table.interColumnSpacing = 0
+                for col in 0..<table.numColumns { table.set(alignment: .center, forColumn: col) }
+                return table
+            } else if env == "eqalign" || env == "split" || env == "aligned"
+                        || env == "align" || env == "alignat" || env == "flalign" {
                 // split is limited to max 2 columns per LaTeX/KaTeX spec
                 // aligned/eqalign can have any number of columns (1, 2, 3, 4+)
                 if env == "split" && table.numColumns > 2 {
@@ -1357,7 +1399,7 @@ public class MTMathAtomFactory {
                 table.set(alignment: .left, forColumn: 2)
                 
                 return table
-            } else if env == "cases" {
+            } else if env == "cases" || env == "dcases" || env == "rcases" {
                 if table.numColumns != 1 && table.numColumns != 2 {
                     let message = "cases environment can have 1 or 2 columns"
                     if error == nil {
